@@ -3,9 +3,9 @@ from pathlib import Path
 from typing import List, Tuple
 
 from src.config import OUTPUT_DIR, DATA_DIR, SCHEMA_FILE
-from src.parser import YmlParser
+from src.parser import YmlParserRozetka
 from schemas import data_schema
-from src.exporters import XmlExporter
+from src.exporters import XmlExporterIntimo, XmlExporterKasta
 from src.logger_config import app_logger
 from validators.xsd_validator import XsdValidator
 
@@ -27,7 +27,7 @@ def process_folder(folder_path: Path) -> List[Tuple[str, data_schema.XmlCatalog]
     for xml_file in xml_files:
         app_logger.info(f"-> Processing file: {xml_file.name}")
         try:
-            parser = YmlParser(file_path=str(xml_file))
+            parser = YmlParserRozetka(file_path=str(xml_file))
             catalog = parser.parse()
             if catalog:
                 catalogs.append((xml_file.name.split(".")[0], catalog))
@@ -58,10 +58,14 @@ def main():
         )
     for catalog_path, catalog in all_parsed_catalogs:
         try:
-            exporter = XmlExporter(catalog=catalog)
+            exporterIntimo = XmlExporterIntimo(catalog=catalog)
             output_file_path = OUTPUT_DIR / f"{catalog_path}_intimo.xml"
-            exporter.export(str(output_file_path))
+            exporterIntimo.export(str(output_file_path))
             is_valid = validator.validate(xml_path=Path(output_file_path))
+
+            exporterKasta = XmlExporterKasta(catalog=catalog)
+            output_file_path = OUTPUT_DIR / f"{catalog_path}_kasta.xml"
+            exporterKasta.export(str(output_file_path))
             if is_valid:
                 app_logger.info("Validation check completed successfully.")
             else:

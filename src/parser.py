@@ -7,7 +7,7 @@ from src.logger_config import app_logger
 from schemas import data_schema
 
 
-class YmlParser:
+class YmlParserRozetka:
     """
     Class responsible for parsing YML files.
     Accepts a file path and converts it into an XmlCatalog object.

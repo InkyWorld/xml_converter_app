@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -8,9 +9,50 @@ from lxml import etree as ET
 from schemas import data_schema
 from src.logger_config import app_logger
 
-class XmlExporter:
+class BaseExporter(ABC):
     """
-    Class responsible for exporting an XmlCatalog object
+    Інтерфейс для всіх класів-експортерів.
+    Визначає загальний контракт: будь-який експортер повинен вміти
+    прийняти каталог даних і виконати експорт за вказаним шляхом.
+    """
+
+    def __init__(self, catalog: data_schema.XmlCatalog):
+        """Ініціалізує експортер, приймаючи дані каталогу."""
+        self.catalog = catalog
+        super().__init__()
+
+    @abstractmethod
+    def export(self, output_path: str):
+        """
+        Основний метод, який запускає процес експорту даних у файл.
+        """
+        pass
+
+    @staticmethod
+    def _create_sub_element(
+        parent: ET._Element, tag_name: str, text: str | None = None, cdata: bool = False
+    ):
+        """
+        Helper function to create an XML sub-element with optional CDATA content.
+
+        :param parent: Parent XML element.
+        :param tag_name: Name of the new sub-element.
+        :param text: Optional text content for the element.
+        :param cdata: Whether to wrap text in a CDATA block.
+        :return: Created XML sub-element.
+        """
+        element = ET.SubElement(parent, tag_name)
+        if text is not None:
+            if cdata and text:
+                element.text = ET.CDATA(str(text))
+            else:
+                element.text = str(text)
+        return element
+
+
+class XmlExporterIntimo(BaseExporter):
+    """
+    Class responsible for exporting an XmlExporterIntimo object
     into a new, more structured and strict XML format.
     """
 
@@ -20,7 +62,7 @@ class XmlExporter:
 
         :param catalog: Parsed XmlCatalog object containing products, categories, and metadata.
         """
-        self.catalog = catalog
+        super().__init__(catalog)
         self.brand_map: Dict[str, int] = {}
         self.color_map: Dict[str, str] = {}
         self.category_to_line_id_map: Dict[str, str] = {}
@@ -64,26 +106,6 @@ class XmlExporter:
                     if color_name not in self.color_map:
                         key = str(len(self.color_map) + 1)
                         self.color_map[color_name] = key
-
-    def _create_sub_element(
-        self, parent: ET._Element, tag_name: str, text: str = None, cdata: bool = False
-    ):
-        """
-        Helper function to create an XML sub-element with optional CDATA content.
-
-        :param parent: Parent XML element.
-        :param tag_name: Name of the new sub-element.
-        :param text: Optional text content for the element.
-        :param cdata: Whether to wrap text in a CDATA block.
-        :return: Created XML sub-element.
-        """
-        element = ET.SubElement(parent, tag_name)
-        if text is not None:
-            if cdata and text:
-                element.text = ET.CDATA(str(text))
-            else:
-                element.text = str(text)
-        return element
 
     def export(self, output_path: str):
         """
@@ -321,3 +343,95 @@ class XmlExporter:
             self._create_sub_element(
                 variation_node, "stock_quantity", str(stock_quantity)
             )
+
+
+class XmlExporterKasta(BaseExporter):
+    """
+    Class responsible for exporting an XmlCatalog object
+    into a YML XML format compatible with Kasta.
+    """
+    def export(self, output_path: str):
+        """
+        Export the catalog data to a Kasta-specific XML file.
+        Each offer from the input is treated as a separate product variation
+        and grouped by its article number.
+
+        :param output_path: The path where the XML file will be saved.
+        """
+        app_logger.info("Starting Kasta XML export...")
+
+        root = ET.Element("yml_catalog", date=self.catalog.catalog_date) 
+        shop = self._create_sub_element(root, "shop")
+
+        # --- Shop Details ---
+        self._create_sub_element(shop, "name", self.catalog.name)
+        # self._create_sub_element(shop, "company", self.catalog.company)
+        # self._create_sub_element(shop, "url", self.catalog.url)
+
+        # --- Currencies ---
+        currencies_node = self._create_sub_element(shop, "currencies") #
+        for currency_id, rate in self.catalog.currencies.items():
+            # _create_sub_element не підтримує атрибути, тому використовуємо ET.SubElement напряму
+            ET.SubElement(currencies_node, "currency", id=currency_id, rate=str(rate)) #
+
+        # --- Categories ---
+        categories_node = self._create_sub_element(shop, "categories") #
+        for cat_id, cat_name in self.catalog.categories.items():
+            # Аналогічно для категорій
+            cat_element = ET.SubElement(categories_node, "category", id=str(cat_id)) #
+            cat_element.text = cat_name
+
+        # --- Offers ---
+        offers_node = self._create_sub_element(shop, "offers") #
+        for offer in self.catalog.offers:
+            offer_attributes = {
+                "id": str(offer.id),
+                "available": "true" if offer.is_in_stock() else "false",
+            }
+
+            offer_node = ET.SubElement(offers_node, "offer", **offer_attributes) #
+
+            self._create_sub_element(offer_node, "url", offer.url)
+            self._create_sub_element(offer_node, "price", str(offer.price)) #
+            self._create_sub_element(offer_node, "currencyId", offer.currency_id) #
+            self._create_sub_element(offer_node, "categoryId", str(offer.category_id)) #
+            
+            for picture in offer.pictures:
+                self._create_sub_element(offer_node, "picture", picture) #
+
+            if offer.name_ua:
+                self._create_sub_element(offer_node, "name_ua", offer.name_ua)
+            if offer.name:
+                self._create_sub_element(offer_node, "name", offer.name)
+            
+            self._create_sub_element(offer_node, "vendor", offer.vendor)
+            self._create_sub_element(offer_node, "vendorCode", offer.article)
+            
+            if offer.description_ua:
+                 self._create_sub_element(offer_node, "description_ua", offer.description_ua, cdata=True)
+            if offer.description:
+                self._create_sub_element(offer_node, "description", offer.description, cdata=True)
+
+            stock_quantity = offer.stock_quantity if offer.is_in_stock() else 0
+            self._create_sub_element(offer_node, "stock_quantity", str(stock_quantity))
+
+            for param in offer.params:
+                if param.name.lower() in ["color", "колір"]:
+                    param_element = ET.SubElement(offer_node, "param", name="Колір")
+                    param_element.text = str(param.value)
+                elif param.name.lower() in ["size", "розмір", "зріст"]:
+                    param_element = ET.SubElement(offer_node, "param", name="Розмір")
+                else:
+                    param_element = ET.SubElement(offer_node, "param", name=param.name)
+                param_element.text = str(param.value)
+
+        # --- Writing to file ---
+        tree = ET.ElementTree(root)
+        try:
+            Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+            tree.write(
+                output_path, pretty_print=True, xml_declaration=True, encoding="UTF-8"
+            )
+            app_logger.info(f"Successfully exported Kasta XML to {output_path}")
+        except IOError as e:
+            app_logger.error(f"Error writing to file {output_path}: {e}")
