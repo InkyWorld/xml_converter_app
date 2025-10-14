@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
     <xs:element name="shop">
         <xs:complexType>
             <xs:sequence>
@@ -251,14 +252,7 @@
                                     <xs:element name="variation" minOccurs="1" maxOccurs="unbounded">
                                         <xs:complexType>
                                             <xs:sequence>
-                                                <xs:element name="variation_id">
-                                                    <xs:simpleType>
-                                                        <xs:restriction base="xs:string">
-                                                            <xs:pattern value="[a-zA-Z0-9\-_+]+"/>
-                                                            <xs:maxLength value="36"/>
-                                                        </xs:restriction>
-                                                    </xs:simpleType>
-                                                </xs:element>
+                                                <xs:element name="variation_id" type="xs:string"/>
                                                 <xs:element name="color">
                                                     <xs:simpleType>
                                                         <xs:restriction base="xs:string">

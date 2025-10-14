@@ -59,9 +59,11 @@ class XmlExporter:
         for offer in self.catalog.offers:
             for param in offer.params:
                 if param.name.lower() in ["колір", "color"] and param.value:
-                    if param.value not in self.color_map.values():
-                        key = str(len(self.color_map))
-                        self.color_map[param.value] = str(key)
+                    color_name = param.value.strip().lower()
+
+                    if color_name not in self.color_map:
+                        key = str(len(self.color_map) + 1)
+                        self.color_map[color_name] = key
 
     def _create_sub_element(
         self, parent: ET._Element, tag_name: str, text: str = None, cdata: bool = False
@@ -117,6 +119,8 @@ class XmlExporter:
         date_str = self.catalog.catalog_date or datetime.now().strftime(
             "%Y-%m-%d %H:%M:%S"
         )
+        if len(date_str) == 16:
+            date_str += ":00"
         self._create_sub_element(catalog_node, "catalog_date", date_str)
 
     def _build_store_section(self, parent: ET._Element):
@@ -138,17 +142,36 @@ class XmlExporter:
             self._create_sub_element(brand_node, "id", str(brand_id))
             self._create_sub_element(brand_node, "title", name)
 
+    # src/exporter.py (фрагмент)
+
     def _build_collections_section(self, parent: ET._Element):
         """
-        Build the <collections> section based on real categories.
+        Builds the <collections> section based on the catalog's categories.
+        Ensures that brand_id is present if any brands exist.
         """
         collections_node = self._create_sub_element(parent, "collections")
-        for category_id_str in self.catalog.categories:
-            line_node = self._create_sub_element(collections_node, "collection")
-            line_id = f"line-{category_id_str}"  # Generate unique ID for the collection
-            self._create_sub_element(line_node, "id", line_id)
-            self._create_sub_element(line_node, "collection_id", category_id_str)
-            self._create_sub_element(line_node, "title", "Default Line")
+        
+        fallback_brand_id = None
+        if self.brand_map: # Якщо у нас є хоча б один бренд
+            fallback_brand_id = next(iter(self.brand_map.values()), None)
+
+        for category_id_str, category_name in self.catalog.categories.items():
+            category_id = int(category_id_str)
+            collection_node = self._create_sub_element(collections_node, "collection")
+            self._create_sub_element(collection_node, "id", str(category_id))
+            
+            # Намагаємося знайти пов'язаний brand_id
+            brand_id = self.collection_to_brand_map.get(category_id)
+            
+            # Якщо brand_id не знайдено, але бренди існують, використовуємо запасний
+            if not brand_id and fallback_brand_id:
+                brand_id = fallback_brand_id
+            
+            # ВИПРАВЛЕНО: Додаємо тег <brand_id>, якщо він був знайдений
+            if brand_id:
+                self._create_sub_element(collection_node, "brand_id", str(brand_id))
+            
+            self._create_sub_element(collection_node, "title", category_name)
 
     def _build_lines_section(self, parent: ET._Element):
         """
