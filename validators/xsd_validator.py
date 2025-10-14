@@ -1,6 +1,9 @@
-from lxml import etree
 from pathlib import Path
 from typing import Optional
+
+from lxml import etree
+
+from src.logger_config import app_logger
 
 class XsdValidator:
     """
@@ -32,14 +35,15 @@ class XsdValidator:
             An etree.XMLSchema object if successful, otherwise None.
         """
         if not self.schema_path.is_file():
-            print(f"\n[✗] CRITICAL ERROR: Schema file not found at '{self.schema_path}'")
+            app_logger.error(
+                f"\n[✗] CRITICAL ERROR: Schema file not found at '{self.schema_path}'"
+            )
             return None
         try:
             xmlschema_doc = etree.parse(str(self.schema_path))
             return etree.XMLSchema(xmlschema_doc)
         except etree.XMLSchemaParseError as e:
-            print(f"\n[✗] CRITICAL ERROR: Failed to parse the XSD schema.")
-            print(f"Details: {e}")
+            app_logger.error(f"\n[✗] CRITICAL ERROR: Failed to parse the XSD schema. Details: {e}")
             return None
 
     def validate(self, xml_path: Path) -> bool:
@@ -57,34 +61,36 @@ class XsdValidator:
         """
         # Check if the schema was loaded successfully
         if self.xmlschema is None:
-            print("[✗] VALIDATION SKIPPED: Schema was not loaded correctly.")
+            app_logger.error("[✗] VALIDATION SKIPPED: Schema was not loaded correctly.")
             return False
 
         # Check if the XML file exists
         if not xml_path.is_file():
-            print(f"[✗] VALIDATION FAILED: XML file not found at '{xml_path}'")
+            app_logger.error(f"[✗] VALIDATION FAILED: XML file not found at '{xml_path}'")
             return False
 
         try:
             xml_doc = etree.parse(str(xml_path))
             # Validate using the pre-compiled schema
             self.xmlschema.assertValid(xml_doc)
-            print(f"[✓] SUCCESS: '{xml_path.name}' is valid.")
+            app_logger.info(f"[✓] SUCCESS: '{xml_path.name}' is valid.")
             return True
 
         except etree.DocumentInvalid:
-            print(f"[✗] VALIDATION FAILED: '{xml_path.name}' does not conform to the schema.")
-            print("Errors found:")
+            app_logger.error(
+                f"[✗] VALIDATION FAILED: '{xml_path.name}' does not conform to the schema."
+            )
+            app_logger.error("Errors found:")
             for error in self.xmlschema.error_log:
-                print(f"  - Line {error.line}, Col {error.column}: {error.message}")
+                app_logger.error(f"  - Line {error.line}, Col {error.column}: {error.message}")
             return False
 
         except etree.XMLSyntaxError as e:
-            print(f"[✗] VALIDATION FAILED: '{xml_path.name}' has syntax errors and cannot be parsed.")
-            print(f"Details: {e}")
+            app_logger.error(
+                f"[✗] VALIDATION FAILED: '{xml_path.name}' has syntax errors and cannot be parsed. Details: {e}"
+            )
             return False
-            
+
         except Exception as e:
-            print(f"[✗] VALIDATION FAILED: An unexpected error occurred.")
-            print(f"Details: {e}")
+            app_logger.error(f"[✗] VALIDATION FAILED: An unexpected error occurred. Details: {e}")
             return False

@@ -2,3 +2,4 @@ poetry.lock
 .vscode/
 .venv/
 __pycache__/
+logs/

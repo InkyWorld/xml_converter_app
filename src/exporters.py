@@ -1,11 +1,12 @@
 from collections import defaultdict
-from lxml import etree as ET
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 
-from schemas import data_schema
+from lxml import etree as ET
 
+from schemas import data_schema
+from src.logger_config import app_logger
 
 class XmlExporter:
     """
@@ -88,10 +89,10 @@ class XmlExporter:
 
         :param output_path: Path where the resulting XML file will be saved.
         """
-        print("Preparing data for export...")
+        app_logger.info("Preparing data for export...")
         self._prepare_data_maps()
 
-        print("Building XML structure...")
+        app_logger.info("Building XML structure...")
         root = ET.Element("shop")
         self._build_catalog_section(root)
         self._build_store_section(root)
@@ -103,15 +104,19 @@ class XmlExporter:
 
         tree = ET.ElementTree(root)
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        tree.write(output_path, pretty_print=True, xml_declaration=True, encoding="UTF-8")
-        print(f"Export completed successfully. File saved to: {output_path}")
+        tree.write(
+            output_path, pretty_print=True, xml_declaration=True, encoding="UTF-8"
+        )
+        app_logger.info(f"Export completed successfully. File saved to: {output_path}")
 
     def _build_catalog_section(self, parent: ET._Element):
         """
         Build the <catalog> section containing metadata such as the catalog date.
         """
         catalog_node = self._create_sub_element(parent, "catalog")
-        date_str = self.catalog.catalog_date or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        date_str = self.catalog.catalog_date or datetime.now().strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
         self._create_sub_element(catalog_node, "catalog_date", date_str)
 
     def _build_store_section(self, parent: ET._Element):
@@ -150,7 +155,9 @@ class XmlExporter:
         Build the <lines> section representing product lines (linked to categories).
         """
         lines_node = self._create_sub_element(parent, "lines")
-        for i, (category_id_str, category_name) in enumerate(self.catalog.categories.items()):
+        for i, (category_id_str, category_name) in enumerate(
+            self.catalog.categories.items()
+        ):
             category_id = int(category_id_str)
             collection_node = self._create_sub_element(lines_node, "line")
             self.category_to_line_id_map[str(category_id)] = str(i + 1)
@@ -170,7 +177,9 @@ class XmlExporter:
             # TODO: Add color image link if available
             # self._create_sub_element(color_node, "color_image_link", "https://placeholder.com/color.jpg")
 
-    def _build_items_section(self, parent: ET._Element, price_r_rate=1.0, price_w_rate=1.0):
+    def _build_items_section(
+        self, parent: ET._Element, price_r_rate=1.0, price_w_rate=1.0
+    ):
         """
         Build the <items> section, grouping offers by article number.
         Each article group becomes a single <item> with multiple variations.
@@ -182,7 +191,9 @@ class XmlExporter:
         items_node = self._create_sub_element(parent, "items")
 
         if not hasattr(self, "article_groups") or not self.article_groups:
-            print("Error: Offers were not grouped by article. Run _prepare_data_maps() first.")
+            app_logger.error(
+                "Error: Offers were not grouped by article. Run _prepare_data_maps() first."
+            )
             return
 
         for article, offer_group in self.article_groups.items():
@@ -199,19 +210,27 @@ class XmlExporter:
             # Map category to corresponding line
             line_id = self.category_to_line_id_map.get(main_offer.category_id, "1")
 
-            self._create_sub_element(item_node, "item_id", str(main_offer.id).split("-")[0])
+            self._create_sub_element(
+                item_node, "item_id", str(main_offer.id).split("-")[0]
+            )
             self._create_sub_element(item_node, "art", article)
             self._create_sub_element(item_node, "line_id", line_id)
             self._create_sub_element(item_node, "title", main_offer.name)
-            self._create_sub_element(item_node, "description_ua", main_offer.description, cdata=True)
+            self._create_sub_element(
+                item_node, "description_ua", main_offer.description, cdata=True
+            )
             self._create_sub_element(item_node, "materials", materials)
             self._create_sub_element(item_node, "link", main_offer.url)
 
             # Price calculations (converted to integers)
             base_price = main_offer.price
             self._create_sub_element(item_node, "price", str(int(base_price)))
-            self._create_sub_element(item_node, "price_r", str(int(base_price * price_r_rate)))
-            self._create_sub_element(item_node, "price_w", str(int(base_price * price_w_rate)))
+            self._create_sub_element(
+                item_node, "price_r", str(int(base_price * price_r_rate))
+            )
+            self._create_sub_element(
+                item_node, "price_w", str(int(base_price * price_w_rate))
+            )
 
             # Collect unique images from all offers in the group
             unique_pictures = set()
@@ -227,7 +246,9 @@ class XmlExporter:
                     if pic_url in offer_in_group.pictures:
                         for param in offer_in_group.params:
                             if param.name.lower() in ["колір", "color"]:
-                                color_slug_id_for_pic = self.color_map.get(str(param.value))
+                                color_slug_id_for_pic = self.color_map.get(
+                                    str(param.value)
+                                )
                                 break
                     if color_slug_id_for_pic:
                         break
@@ -238,7 +259,9 @@ class XmlExporter:
             # Build variations for this item
             self._build_variations_section(item_node, offer_group)
 
-    def _build_variations_section(self, parent: ET._Element, offer_group: List[data_schema.Offer]):
+    def _build_variations_section(
+        self, parent: ET._Element, offer_group: List[data_schema.Offer]
+    ):
         """
         Build the <variations> section for a group of offers (same article).
         Each offer in the group represents a separate variation.
@@ -269,5 +292,9 @@ class XmlExporter:
             self._create_sub_element(variation_node, "size", size)
 
             # Stock quantity: 0 if item is out of stock
-            stock_quantity = offer_variation.stock_quantity if offer_variation.is_in_stock() else 0
-            self._create_sub_element(variation_node, "stock_quantity", str(stock_quantity))
+            stock_quantity = (
+                offer_variation.stock_quantity if offer_variation.is_in_stock() else 0
+            )
+            self._create_sub_element(
+                variation_node, "stock_quantity", str(stock_quantity)
+            )
