@@ -1,177 +1,292 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xs:element name="shop">
-    <xs:complexType>
+    <xs:element name="shop">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="catalog" type="CatalogType"/>
+                <xs:element name="store" type="StoreType"/>
+                <xs:element name="brands" type="BrandsType" minOccurs="0"/>
+                <xs:element name="collections" type="CollectionsType"/>
+                <xs:element name="lines" type="LinesType"/>
+                <xs:element name="colors" type="ColorsType"/>
+                <xs:element name="items" type="ItemsType"/>
+            </xs:sequence>
+        </xs:complexType>
+
+        <xs:key name="brandKey">
+            <xs:selector xpath="brands/brand"/>
+            <xs:field xpath="id"/>
+        </xs:key>
+        <xs:key name="collectionKey">
+            <xs:selector xpath="collections/collection"/>
+            <xs:field xpath="id"/>
+        </xs:key>
+        <xs:key name="lineKey">
+            <xs:selector xpath="lines/line"/>
+            <xs:field xpath="id"/>
+        </xs:key>
+        <xs:key name="colorKey">
+            <xs:selector xpath="colors/color"/>
+            <xs:field xpath="id"/>
+        </xs:key>
+
+        <xs:keyref name="collectionBrandRef" refer="brandKey">
+            <xs:selector xpath="collections/collection"/>
+            <xs:field xpath="brand_id"/>
+        </xs:keyref>
+        <xs:keyref name="lineCollectionRef" refer="collectionKey">
+            <xs:selector xpath="lines/line"/>
+            <xs:field xpath="collection_id"/>
+        </xs:keyref>
+        <xs:keyref name="itemLineRef" refer="lineKey">
+            <xs:selector xpath="items/item"/>
+            <xs:field xpath="line_id"/>
+        </xs:keyref>
+        <xs:keyref name="imageColorRef" refer="colorKey">
+            <xs:selector xpath="items/item/image_link"/>
+            <xs:field xpath="@color"/>
+        </xs:keyref>
+        <xs:keyref name="variationColorRef" refer="colorKey">
+            <xs:selector xpath="items/item/variations/variation"/>
+            <xs:field xpath="color"/>
+        </xs:keyref>
+    </xs:element>
+
+    <xs:simpleType name="currencyType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="UAH"/>
+            <xs:enumeration value="EUR"/>
+            <xs:enumeration value="USD"/>
+        </xs:restriction>
+    </xs:simpleType>
+    
+    <xs:simpleType name="discountType">
+        <xs:restriction base="xs:decimal">
+            <xs:fractionDigits value="6"/>
+            <xs:minInclusive value="0"/>
+            <xs:maxInclusive value="99.999999"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:complexType name="CatalogType">
         <xs:sequence>
-        <xs:element name="catalog" type="CatalogType"/>
-        <xs:element name="store" type="StoreType"/>
-        <xs:element name="brands" type="BrandsType" minOccurs="0"/>
-        <xs:element name="collections" type="CollectionsType"/>
-        <xs:element name="lines" type="LinesType"/>
-        <xs:element name="colors" type="ColorsType"/>
-        <xs:element name="items" type="ItemsType"/>
+            <xs:element name="catalog_date">
+                <xs:simpleType>
+                    <xs:restriction base="xs:string">
+                        <xs:pattern value="\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"/>
+                    </xs:restriction>
+                </xs:simpleType>
+            </xs:element>
         </xs:sequence>
     </xs:complexType>
 
-    <xs:key name="brandKey">
-        <xs:selector xpath="brands/brand"/>
-        <xs:field xpath="id"/>
-    </xs:key>
-    <xs:key name="collectionKey">
-        <xs:selector xpath="collections/collection"/>
-        <xs:field xpath="id"/>
-    </xs:key>
-    <xs:key name="lineKey">
-        <xs:selector xpath="lines/line"/>
-        <xs:field xpath="id"/>
-    </xs:key>
-    <xs:key name="colorKey">
-        <xs:selector xpath="colors/color"/>
-        <xs:field xpath="id"/>
-    </xs:key>
-
-    <xs:keyref name="collectionBrandRef" refer="brandKey">
-        <xs:selector xpath="collections/collection"/>
-        <xs:field xpath="brand_id"/>
-    </xs:keyref>
-    <xs:keyref name="lineCollectionRef" refer="collectionKey">
-        <xs:selector xpath="lines/line"/>
-        <xs:field xpath="collection_id"/>
-    </xs:keyref>
-    <xs:keyref name="itemLineRef" refer="lineKey">
-        <xs:selector xpath="items/item"/>
-        <xs:field xpath="line_id"/>
-    </xs:keyref>
-    <xs:keyref name="variationColorRef" refer="colorKey">
-        <xs:selector xpath="items/item/variations/variation"/>
-        <xs:field xpath="color"/>
-    </xs:keyref>
-    </xs:element>
-
-    <xs:complexType name="CatalogType">
-    <xs:sequence>
-        <xs:element name="catalog_date">
-        <xs:simpleType>
-            <xs:restriction base="xs:string">
-            <xs:pattern value="\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"/>
-            </xs:restriction>
-        </xs:simpleType>
-        </xs:element>
-    </xs:sequence>
-    </xs:complexType>
-
     <xs:complexType name="StoreType">
-    <xs:sequence>
-        <xs:element name="title" type="xs:string"/>
-        <xs:element name="description" type="xs:string" minOccurs="0"/>
-        <xs:element name="link" type="xs:anyURI" minOccurs="0"/>
-    </xs:sequence>
+        <xs:sequence>
+            <xs:element name="title" type="xs:string"/>
+            <xs:element name="description" type="xs:string" minOccurs="0"/>
+            <xs:element name="link" type="xs:anyURI" minOccurs="0"/>
+        </xs:sequence>
     </xs:complexType>
 
     <xs:complexType name="BrandsType">
-    <xs:sequence>
-        <xs:element name="brand" maxOccurs="unbounded">
-        <xs:complexType>
-            <xs:sequence>
-            <xs:element name="id" type="xs:positiveInteger"/>
-            <xs:element name="title" type="xs:string"/>
-            </xs:sequence>
-        </xs:complexType>
-        </xs:element>
-    </xs:sequence>
+        <xs:sequence>
+            <xs:element name="brand" minOccurs="1" maxOccurs="unbounded">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="id">
+                            <xs:simpleType>
+                                <xs:restriction base="xs:positiveInteger">
+                                    <xs:totalDigits value="11"/>
+                                </xs:restriction>
+                            </xs:simpleType>
+                        </xs:element>
+                        <xs:element name="title" type="xs:string"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
     </xs:complexType>
-
+    
     <xs:complexType name="CollectionsType">
-    <xs:sequence>
-        <xs:element name="collection" maxOccurs="unbounded">
-            <xs:complexType>
-                <xs:sequence>
-                    <xs:element name="id" type="xs:positiveInteger"/>
-                    <xs:element name="brand_id" type="xs:positiveInteger" minOccurs="0"/>
-                    <xs:element name="title" type="xs:string"/>
-                </xs:sequence>
-            </xs:complexType>
-        </xs:element>
-    </xs:sequence>
+        <xs:sequence>
+            <xs:element name="collection" minOccurs="1" maxOccurs="unbounded">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="id">
+                            <xs:simpleType>
+                                <xs:restriction base="xs:positiveInteger">
+                                    <xs:totalDigits value="11"/>
+                                </xs:restriction>
+                            </xs:simpleType>
+                        </xs:element>
+                        <xs:element name="brand_id" minOccurs="0">
+                            <xs:simpleType>
+                                <xs:restriction base="xs:positiveInteger">
+                                    <xs:totalDigits value="11"/>
+                                </xs:restriction>
+                            </xs:simpleType>
+                        </xs:element>
+                        <xs:element name="title" type="xs:string"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
     </xs:complexType>
 
     <xs:complexType name="LinesType">
-    <xs:sequence>
-        <xs:element name="line" maxOccurs="unbounded">
-            <xs:complexType>
-                <xs:sequence>
-                    <xs:element name="id" type="xs:string"/>
-                    <xs:element name="collection_id" type="xs:positiveInteger"/>
-                    <xs:element name="title" type="xs:string"/>
-                </xs:sequence>
-            </xs:complexType>
-        </xs:element>
-    </xs:sequence>
+        <xs:sequence>
+            <xs:element name="line" minOccurs="1" maxOccurs="unbounded">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="id">
+                            <xs:simpleType>
+                                <xs:restriction base="xs:string">
+                                    <xs:maxLength value="36"/>
+                                </xs:restriction>
+                            </xs:simpleType>
+                        </xs:element>
+                        <xs:element name="collection_id">
+                             <xs:simpleType>
+                                <xs:restriction base="xs:positiveInteger">
+                                    <xs:totalDigits value="11"/>
+                                </xs:restriction>
+                            </xs:simpleType>
+                        </xs:element>
+                        <xs:element name="title" type="xs:string"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
     </xs:complexType>
 
     <xs:complexType name="ColorsType">
-    <xs:sequence>
-        <xs:element name="color" maxOccurs="unbounded">
-        <xs:complexType>
-            <xs:sequence>
-            <xs:element name="id">
-                <xs:simpleType>
-                <xs:restriction base="xs:string">
-                    <xs:pattern value="[a-zA-Z0-9_-]+"/>
-                    <xs:maxLength value="36"/>
-                </xs:restriction>
-                </xs:simpleType>
+        <xs:sequence>
+            <xs:element name="color" minOccurs="1" maxOccurs="unbounded">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="id">
+                            <xs:simpleType>
+                                <xs:restriction base="xs:string">
+                                    <xs:pattern value="[a-zA-Z0-9_\-]+"/>
+                                    <xs:maxLength value="36"/>
+                                </xs:restriction>
+                            </xs:simpleType>
+                        </xs:element>
+                        <xs:element name="title" type="xs:string"/>
+                        <xs:element name="color_image_link" type="xs:anyURI"/>
+                        <xs:element name="color_image_code" minOccurs="0">
+                            <xs:simpleType>
+                                <xs:restriction base="xs:string">
+                                    <xs:pattern value="[0-9a-fA-F]{6}"/>
+                                </xs:restriction>
+                            </xs:simpleType>
+                        </xs:element>
+                    </xs:sequence>
+                </xs:complexType>
             </xs:element>
-            <xs:element name="title" type="xs:string"/>
-            <xs:element name="color_image_link" type="xs:anyURI"/>
-            <xs:element name="color_image_code" minOccurs="0">
-                <xs:simpleType>
-                <xs:restriction base="xs:string">
-                    <xs:pattern value="[0-9a-fA-F]{6}"/>
-                </xs:restriction>
-                </xs:simpleType>
-            </xs:element>
-            </xs:sequence>
-        </xs:complexType>
-        </xs:element>
-    </xs:sequence>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="ImageLinkType">
+        <xs:simpleContent>
+            <xs:extension base="xs:anyURI">
+                <xs:attribute name="view" type="xs:positiveInteger" use="optional"/>
+                <xs:attribute name="color" use="optional">
+                    <xs:simpleType>
+                        <xs:restriction base="xs:string">
+                            <xs:maxLength value="36"/>
+                        </xs:restriction>
+                    </xs:simpleType>
+                </xs:attribute>
+            </xs:extension>
+        </xs:simpleContent>
     </xs:complexType>
 
     <xs:complexType name="ItemsType">
-    <xs:sequence>
-        <xs:element name="item" maxOccurs="unbounded">
-        <xs:complexType>
-            <xs:sequence>
-            <xs:element name="item_id" type="xs:string"/>
-            <xs:element name="art" type="xs:string"/>
-            <xs:element name="line_id" type="xs:string"/>
-            <xs:element name="title" type="xs:string"/>
-            <xs:element name="description" type="xs:string" minOccurs="0"/>
-            <xs:element name="description_ua" type="xs:string"/>
-            <xs:element name="materials" type="xs:string"/>
-            <xs:element name="price" type="xs:integer"/>
-            <xs:element name="price_r" type="xs:integer"/>
-            <xs:element name="price_w" type="xs:integer"/>
-            <xs:element name="image_link" type="xs:anyURI" maxOccurs="unbounded"/>
-            <xs:element name="variations">
+        <xs:sequence>
+            <xs:element name="item" minOccurs="1" maxOccurs="unbounded">
                 <xs:complexType>
                     <xs:sequence>
-                        <xs:element name="variation" maxOccurs="unbounded">
+                        <xs:element name="item_id">
+                            <xs:simpleType>
+                                <xs:restriction base="xs:string">
+                                    <xs:pattern value="[a-zA-Z0-9\-_+]+"/>
+                                    <xs:maxLength value="36"/>
+                                </xs:restriction>
+                            </xs:simpleType>
+                        </xs:element>
+                        <xs:element name="art" type="xs:string"/>
+                        <xs:element name="line_id">
+                            <xs:simpleType>
+                                <xs:restriction base="xs:string">
+                                    <xs:maxLength value="36"/>
+                                </xs:restriction>
+                            </xs:simpleType>
+                        </xs:element>
+                        <xs:element name="col_brand_id" minOccurs="0">
+                            <xs:simpleType>
+                                <xs:restriction base="xs:positiveInteger">
+                                    <xs:totalDigits value="11"/>
+                                </xs:restriction>
+                            </xs:simpleType>
+                        </xs:element>
+                        <xs:element name="title" type="xs:string"/>
+                        <xs:element name="description" type="xs:string" minOccurs="0"/>
+                        <xs:element name="description_ua" type="xs:string"/>
+                        <xs:element name="country" type="xs:string" minOccurs="0"/>
+                        <xs:element name="materials" type="xs:string"/>
+                        <xs:element name="link" type="xs:anyURI" minOccurs="0"/>
+                        <xs:element name="price" type="xs:integer"/>
+                        <xs:element name="price_r" type="xs:integer"/>
+                        <xs:element name="price_w" type="xs:integer"/>
+                        <xs:element name="currency_price" type="currencyType" minOccurs="0"/>
+                        <xs:element name="currency_price_r" type="currencyType" minOccurs="0"/>
+                        <xs:element name="currency_price_w" type="currencyType" minOccurs="0"/>
+                        <xs:element name="discount" type="discountType" minOccurs="0"/>
+                        <xs:element name="discount_w" type="discountType" minOccurs="0"/>
+                        <xs:element name="image_link" type="ImageLinkType" minOccurs="1" maxOccurs="unbounded"/>
+                        <xs:element name="video_link" type="xs:anyURI" minOccurs="0" maxOccurs="unbounded"/>
+                        <xs:element name="variations">
                             <xs:complexType>
                                 <xs:sequence>
-                                    <xs:element name="variation_id" type="xs:string"/>
-                                    <xs:element name="color" type="xs:string"/>
-                                    <xs:element name="size" type="xs:string"/>
-                                    <xs:element name="stock_quantity" type="xs:nonNegativeInteger"/>
+                                    <xs:element name="variation" minOccurs="1" maxOccurs="unbounded">
+                                        <xs:complexType>
+                                            <xs:sequence>
+                                                <xs:element name="variation_id">
+                                                    <xs:simpleType>
+                                                        <xs:restriction base="xs:string">
+                                                            <xs:pattern value="[a-zA-Z0-9\-_+]+"/>
+                                                            <xs:maxLength value="36"/>
+                                                        </xs:restriction>
+                                                    </xs:simpleType>
+                                                </xs:element>
+                                                <xs:element name="color">
+                                                    <xs:simpleType>
+                                                        <xs:restriction base="xs:string">
+                                                            <xs:maxLength value="36"/>
+                                                        </xs:restriction>
+                                                    </xs:simpleType>
+                                                </xs:element>
+                                                <xs:element name="size" type="xs:string"/>
+                                                <xs:element name="stock_quantity" type="xs:nonNegativeInteger"/>
+                                                <xs:element name="ean" type="xs:string" minOccurs="0"/>
+                                                <xs:element name="price" type="xs:integer" minOccurs="0"/>
+                                                <xs:element name="price_r" type="xs:integer" minOccurs="0"/>
+                                                <xs:element name="price_w" type="xs:integer" minOccurs="0"/>
+                                                <xs:element name="currency_price" type="currencyType" minOccurs="0"/>
+                                                <xs:element name="currency_price_r" type="currencyType" minOccurs="0"/>
+                                                <xs:element name="currency_price_w" type="currencyType" minOccurs="0"/>
+                                                <xs:element name="discount" type="discountType" minOccurs="0"/>
+                                                <xs:element name="discount_w" type="discountType" minOccurs="0"/>
+                                            </xs:sequence>
+                                        </xs:complexType>
+                                    </xs:element>
                                 </xs:sequence>
                             </xs:complexType>
                         </xs:element>
                     </xs:sequence>
                 </xs:complexType>
             </xs:element>
-            </xs:sequence>
-        </xs:complexType>
-        </xs:element>
-    </xs:sequence>
+        </xs:sequence>
     </xs:complexType>
 
 </xs:schema>

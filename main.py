@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import List
 
-from src.config import OUTPUT_DIR, DATA_DIR
+from src.config import OUTPUT_DIR, DATA_DIR, SCHEMA_FILE
 from src.parser import YmlParser
 from schemas import data_schema
 from src.exporters import XmlExporter

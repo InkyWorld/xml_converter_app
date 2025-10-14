@@ -1,0 +1,90 @@
+from lxml import etree
+from pathlib import Path
+from typing import Optional
+
+class XsdValidator:
+    """
+    Validates XML files against a pre-loaded and compiled XSD schema.
+
+    This class is designed for efficiency and reusability. The XSD schema
+    is parsed and compiled once during initialization. The validate() method
+    can then be called multiple times for different XML files.
+    """
+
+    def __init__(self, schema_path: Path):
+        """
+        Initializes the validator and pre-loads the XSD schema.
+
+        Args:
+            schema_path (Path): The file path to the XSD schema file.
+        """
+        self.schema_path = schema_path
+        self.xmlschema: Optional[etree.XMLSchema] = self._load_schema()
+
+    def _load_schema(self) -> Optional[etree.XMLSchema]:
+        """
+        Parses and compiles the XSD schema file.
+
+        This private method is called once during initialization.
+        It handles schema file existence and parsing errors.
+
+        Returns:
+            An etree.XMLSchema object if successful, otherwise None.
+        """
+        if not self.schema_path.is_file():
+            print(f"\n[✗] CRITICAL ERROR: Schema file not found at '{self.schema_path}'")
+            return None
+        try:
+            xmlschema_doc = etree.parse(str(self.schema_path))
+            return etree.XMLSchema(xmlschema_doc)
+        except etree.XMLSchemaParseError as e:
+            print(f"\n[✗] CRITICAL ERROR: Failed to parse the XSD schema.")
+            print(f"Details: {e}")
+            return None
+
+    def validate(self, xml_path: Path) -> bool:
+        """
+        Executes the validation process for a given XML file.
+
+        This method can be called multiple times to validate different XML files
+        against the schema that was loaded during the object's initialization.
+
+        Args:
+            xml_path (Path): The path to the XML file to be validated.
+
+        Returns:
+            True if the XML file is valid, False otherwise.
+        """
+        # Check if the schema was loaded successfully
+        if self.xmlschema is None:
+            print("[✗] VALIDATION SKIPPED: Schema was not loaded correctly.")
+            return False
+
+        # Check if the XML file exists
+        if not xml_path.is_file():
+            print(f"[✗] VALIDATION FAILED: XML file not found at '{xml_path}'")
+            return False
+
+        try:
+            xml_doc = etree.parse(str(xml_path))
+            # Validate using the pre-compiled schema
+            self.xmlschema.assertValid(xml_doc)
+            print(f"[✓] SUCCESS: '{xml_path.name}' is valid.")
+            return True
+
+        except etree.DocumentInvalid:
+            print(f"[✗] VALIDATION FAILED: '{xml_path.name}' does not conform to the schema.")
+            print("Errors found:")
+            for error in self.xmlschema.error_log:
+                print(f"  - Line {error.line}, Col {error.column}: {error.message}")
+            return False
+
+        except etree.XMLSyntaxError as e:
+            print(f"[✗] VALIDATION FAILED: '{xml_path.name}' has syntax errors and cannot be parsed.")
+            print(f"Details: {e}")
+            return False
+            
+        except Exception as e:
+            print(f"[✗] VALIDATION FAILED: An unexpected error occurred.")
+            print(f"Details: {e}")
+            return False
