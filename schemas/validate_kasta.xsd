@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:vc="http://www.w3.org/2007/XMLSchema-versioning"
+           elementFormDefault="qualified"
+           vc:minVersion="1.1">
+
+  <xs:simpleType name="customDateTime">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:element name="yml_catalog">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="shop" type="shopType"/>
+      </xs:sequence>
+      <xs:attribute name="date" type="customDateTime" use="required"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="shopType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string" minOccurs="1"/>
+    
+      <xs:element name="currencies">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="currency" maxOccurs="unbounded">
+              <xs:complexType>
+                <xs:attribute name="id" type="xs:string" use="required"/>
+                <xs:attribute name="rate" type="xs:decimal" use="required"/>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      
+      <xs:element name="categories">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="category" maxOccurs="unbounded">
+              <xs:complexType>
+                <xs:simpleContent>
+                  <xs:extension base="xs:string">
+                    <xs:attribute name="id" type="xs:positiveInteger" use="required"/>
+                    <xs:attribute name="parentId" type="xs:positiveInteger" use="optional"/>
+                    <xs:attribute name="rz_id" type="xs:string" use="optional"/>
+                  </xs:extension>
+                </xs:simpleContent>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      
+      <xs:element name="offers">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="offer" type="offerType" minOccurs="0" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="offerType">
+    <xs:all>
+      <xs:element name="currencyId" type="xs:string" minOccurs="1"/>
+      <xs:element name="categoryId" type="xs:positiveInteger" minOccurs="1"/>
+      <xs:element name="price" type="xs:decimal" minOccurs="1"/>
+      <xs:element name="vendor" type="xs:string" minOccurs="1"/>
+
+      <xs:element name="stock_quantity" type="xs:nonNegativeInteger" minOccurs="0"/>
+      <xs:element name="quantity_in_stock" type="xs:nonNegativeInteger" minOccurs="0"/>
+      <xs:element name="stock" type="xs:nonNegativeInteger" minOccurs="0"/>
+
+      <xs:element name="price_old" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="old_price" type="xs:decimal" minOccurs="0"/>
+      
+      <xs:element name="price_promo" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="promo_price" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="promo_new_price" type="xs:decimal" minOccurs="0"/>
+
+      <xs:element name="vendorcode" type="xs:string" minOccurs="0"/>
+      <xs:element name="article" type="xs:string" minOccurs="0"/>
+
+      <xs:element name="name_ua" type="xs:string" minOccurs="0"/>
+      <xs:element name="name" type="xs:string" minOccurs="0"/>
+      <xs:element name="name_ru" type="xs:string" minOccurs="0"/>
+
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="description_ua" type="xs:string" minOccurs="0"/>
+    </xs:all>
+    
+    <xs:sequence>
+      <xs:element name="picture" type="xs:anyURI" minOccurs="1" maxOccurs="20"/>
+      <xs:element name="param" minOccurs="0" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:simpleContent>
+            <xs:extension base="xs:string">
+              <xs:attribute name="name" type="xs:string" use="required"/>
+            </xs:extension>
+          </xs:simpleContent>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+
+  <xs:assert test="count(stock_quantity | quantity_in_stock | stock) &lt;= 1"
+              xpathDefaultNamespace="##local"/>
+  <xs:assert test="count(price_old | old_price) &lt;= 1"
+              xpathDefaultNamespace="##local"/>
+  <xs:assert test="count(price_promo | promo_price | promo_new_price) &lt;= 1"
+              xpathDefaultNamespace="##local"/>
+  <xs:assert test="count(vendorcode | article) = 1"
+              xpathDefaultNamespace="##local"/>
+  <xs:assert test="count(description | description_ua) &lt;= 1"
+              xpathDefaultNamespace="##local"/>
+  
+  <xs:assert test="param[@name='Розмір'] and param[@name='Колір']"
+              xpathDefaultNamespace="##local"/>
+</xs:complexType>
+
+</xs:schema>
