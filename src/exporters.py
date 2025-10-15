@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
+import csv
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
@@ -8,6 +9,7 @@ from lxml import etree as ET
 
 from schemas import data_schema
 from src.logger_config import app_logger
+from src.config import DATA_DIR
 
 class BaseExporter(ABC):
     """
@@ -350,6 +352,34 @@ class XmlExporterKasta(BaseExporter):
     Class responsible for exporting an XmlCatalog object
     into a YML XML format compatible with Kasta.
     """
+    def __init__(self, catalog: data_schema.XmlCatalog):
+        """Ініціалізує експортер та завантажує довідник категорій з файлу."""
+        super().__init__(catalog)
+        self.rozetka_id_map = self._load_rozetka_id_map()
+    
+    def _load_rozetka_id_map(self) -> Dict[str, str]:
+        """
+        Завантажує та розбирає CSV-файл з мапінгом категорій.
+        Шукає файл у папці 'data' в корені проєкту.
+        """
+        mapping = {}
+        # Шлях до файлу відносно кореня проєкту
+        file_path = DATA_DIR / 'name_rzid.csv'
+        
+        try:
+            with open(file_path, mode='r', encoding='utf-8') as infile:
+                reader = csv.DictReader(infile)
+                for row in reader:
+                    if row.get('name_ru') and row.get('rz_id'):
+                        mapping[row['name_ru'].lower()] = (row['rz_id'], row.get('name_ua'))
+            app_logger.info(f"Successfully loaded {len(mapping)} category mappings from {file_path}")
+        except FileNotFoundError:
+            app_logger.error(f"Category mapping file not found at {file_path}. `rz_id` will not be added.")
+        except Exception as e:
+            app_logger.error(f"An error occurred while reading the category mapping file: {e}")
+            
+        return mapping
+
     def export(self, output_path: str):
         """
         Export the catalog data to a Kasta-specific XML file.
@@ -375,10 +405,13 @@ class XmlExporterKasta(BaseExporter):
             ET.SubElement(currencies_node, "currency", id=currency_id, rate=str(rate)) #
 
         # --- Categories ---
-        categories_node = self._create_sub_element(shop, "categories") #
+        categories_node = self._create_sub_element(shop, "categories")
         for cat_id, cat_name in self.catalog.categories.items():
-            # Аналогічно для категорій
-            cat_element = ET.SubElement(categories_node, "category", id=str(cat_id)) #
+            attributes = {"id": str(cat_id)}
+            if cat_name.lower() in self.rozetka_id_map.keys():
+                attributes["rz_id"] = self.rozetka_id_map[cat_name.lower()][0]
+
+            cat_element = ET.SubElement(categories_node, "category", **attributes)
             cat_element.text = cat_name
 
         # --- Offers ---

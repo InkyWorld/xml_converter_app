@@ -3,3 +3,5 @@ poetry.lock
 .venv/
 __pycache__/
 logs/
+input/
+output/

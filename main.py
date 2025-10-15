@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import List, Tuple
 
-from src.config import OUTPUT_DIR, DATA_DIR, SCHEMA_FILE
+from src.config import INPUT_DIR, OUTPUT_DIR, DATA_DIR, SCHEMA_FILE
 from src.parser import YmlParserRozetka
 from schemas import data_schema
 from src.exporters import XmlExporterIntimo, XmlExporterKasta
@@ -43,8 +43,8 @@ def process_folder(folder_path: Path) -> List[Tuple[str, data_schema.XmlCatalog]
 
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    os.makedirs(DATA_DIR, exist_ok=True)
-    all_parsed_catalogs = process_folder(DATA_DIR)
+    os.makedirs(INPUT_DIR, exist_ok=True)
+    all_parsed_catalogs = process_folder(INPUT_DIR)
     app_logger.info("\n--- Finished processing all files. ---")
 
     if not all_parsed_catalogs:
