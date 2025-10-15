@@ -11,6 +11,7 @@ from schemas import data_schema
 from src.logger_config import app_logger
 from src.config import DATA_DIR
 
+
 class BaseExporter(ABC):
     """
     Інтерфейс для всіх класів-експортерів.
@@ -58,11 +59,18 @@ class XmlExporterIntimo(BaseExporter):
     into a new, more structured and strict XML format.
     """
 
-    def __init__(self, catalog: data_schema.XmlCatalog):
+    def __init__(
+        self,
+        catalog: data_schema.XmlCatalog,
+        boutique_coefficient: float = 2.2,
+        wholesale_ratio: float = 1.2,
+    ):
         """
         Initialize the exporter and set up internal mappings.
 
         :param catalog: Parsed XmlCatalog object containing products, categories, and metadata.
+        :param boutique_coefficient: Coefficient to calculate boutique price from base price.
+        :param wholesale_ratio: Ratio to calculate wholesale price from boutique price.
         """
         super().__init__(catalog)
         self.brand_map: Dict[str, int] = {}
@@ -70,6 +78,8 @@ class XmlExporterIntimo(BaseExporter):
         self.category_to_line_id_map: Dict[str, str] = {}
         self.collection_to_brand_map: Dict[int, int] = {}
         self.article_groups: Dict[str, List[data_schema.Offer]] = defaultdict(list)
+        self.boutique_coefficient: float = boutique_coefficient
+        self.wholesale_ratio: float = wholesale_ratio
 
     def _prepare_data_maps(self):
         """
@@ -174,27 +184,27 @@ class XmlExporterIntimo(BaseExporter):
         Ensures that brand_id is present if any brands exist.
         """
         collections_node = self._create_sub_element(parent, "collections")
-        
+
         fallback_brand_id = None
-        if self.brand_map: # Якщо у нас є хоча б один бренд
+        if self.brand_map:  # Якщо у нас є хоча б один бренд
             fallback_brand_id = next(iter(self.brand_map.values()), None)
 
         for category_id_str, category_name in self.catalog.categories.items():
             category_id = int(category_id_str)
             collection_node = self._create_sub_element(collections_node, "collection")
             self._create_sub_element(collection_node, "id", str(category_id))
-            
+
             # Намагаємося знайти пов'язаний brand_id
             brand_id = self.collection_to_brand_map.get(category_id)
-            
+
             # Якщо brand_id не знайдено, але бренди існують, використовуємо запасний
             if not brand_id and fallback_brand_id:
                 brand_id = fallback_brand_id
-            
+
             # ВИПРАВЛЕНО: Додаємо тег <brand_id>, якщо він був знайдений
             if brand_id:
                 self._create_sub_element(collection_node, "brand_id", str(brand_id))
-            
+
             self._create_sub_element(collection_node, "title", category_name)
 
     def _build_lines_section(self, parent: ET._Element):
@@ -224,16 +234,14 @@ class XmlExporterIntimo(BaseExporter):
             # TODO: Add color image link if available
             # self._create_sub_element(color_node, "color_image_link", "https://placeholder.com/color.jpg")
 
-    def _build_items_section(
-        self, parent: ET._Element, price_r_rate=1.0, price_w_rate=1.0
-    ):
+    def _build_items_section(self, parent: ET._Element):
         """
         Build the <items> section, grouping offers by article number.
         Each article group becomes a single <item> with multiple variations.
 
         :param parent: Parent <shop> XML element.
-        :param price_r_rate: Multiplier for retail price calculation.
-        :param price_w_rate: Multiplier for wholesale price calculation.
+        :param boutique_coefficient: Multiplier for boutique price calculation.
+        :param wholesale_ratio: Multiplier for wholesale price calculation.
         """
         items_node = self._create_sub_element(parent, "items")
 
@@ -270,14 +278,17 @@ class XmlExporterIntimo(BaseExporter):
             self._create_sub_element(item_node, "link", main_offer.url)
 
             # Price calculations (converted to integers)
-            base_price = main_offer.price
-            self._create_sub_element(item_node, "price", str(int(base_price)))
-            self._create_sub_element(
-                item_node, "price_r", str(int(base_price * price_r_rate))
+            price = (
+                int(main_offer.price / self.boutique_coefficient)
+                if main_offer.price
+                else 0
             )
-            self._create_sub_element(
-                item_node, "price_w", str(int(base_price * price_w_rate))
-            )
+            price_r = main_offer.price if price else 0
+            price_w = int(price * self.wholesale_ratio) if main_offer.price else 0
+
+            self._create_sub_element(item_node, "price", str(price))
+            self._create_sub_element(item_node, "price_r", str(price_r))
+            self._create_sub_element(item_node, "price_w", str(price_w))
 
             # Collect unique images from all offers in the group
             unique_pictures = set()
@@ -352,11 +363,12 @@ class XmlExporterKasta(BaseExporter):
     Class responsible for exporting an XmlCatalog object
     into a YML XML format compatible with Kasta.
     """
+
     def __init__(self, catalog: data_schema.XmlCatalog):
         """Ініціалізує експортер та завантажує довідник категорій з файлу."""
         super().__init__(catalog)
         self.rozetka_id_map = self._load_rozetka_id_map()
-    
+
     def _load_rozetka_id_map(self) -> Dict[str, str]:
         """
         Завантажує та розбирає CSV-файл з мапінгом категорій.
@@ -364,20 +376,29 @@ class XmlExporterKasta(BaseExporter):
         """
         mapping = {}
         # Шлях до файлу відносно кореня проєкту
-        file_path = DATA_DIR / 'name_rzid.csv'
-        
+        file_path = DATA_DIR / "name_rzid.csv"
+
         try:
-            with open(file_path, mode='r', encoding='utf-8') as infile:
+            with open(file_path, mode="r", encoding="utf-8") as infile:
                 reader = csv.DictReader(infile)
                 for row in reader:
-                    if row.get('name_ru') and row.get('rz_id'):
-                        mapping[row['name_ru'].lower()] = (row['rz_id'], row.get('name_ua'))
-            app_logger.info(f"Successfully loaded {len(mapping)} category mappings from {file_path}")
+                    if row.get("name_ru") and row.get("rz_id"):
+                        mapping[row["name_ru"].lower()] = (
+                            row["rz_id"],
+                            row.get("name_ua"),
+                        )
+            app_logger.info(
+                f"Successfully loaded {len(mapping)} category mappings from {file_path}"
+            )
         except FileNotFoundError:
-            app_logger.error(f"Category mapping file not found at {file_path}. `rz_id` will not be added.")
+            app_logger.error(
+                f"Category mapping file not found at {file_path}. `rz_id` will not be added."
+            )
         except Exception as e:
-            app_logger.error(f"An error occurred while reading the category mapping file: {e}")
-            
+            app_logger.error(
+                f"An error occurred while reading the category mapping file: {e}"
+            )
+
         return mapping
 
     def export(self, output_path: str):
@@ -390,7 +411,7 @@ class XmlExporterKasta(BaseExporter):
         """
         app_logger.info("Starting Kasta XML export...")
 
-        root = ET.Element("yml_catalog", date=self.catalog.catalog_date) 
+        root = ET.Element("yml_catalog", date=self.catalog.catalog_date)
         shop = self._create_sub_element(root, "shop")
 
         # --- Shop Details ---
@@ -399,7 +420,7 @@ class XmlExporterKasta(BaseExporter):
         # self._create_sub_element(shop, "url", self.catalog.url)
 
         # --- Currencies ---
-        currencies_node = self._create_sub_element(shop, "currencies") #
+        currencies_node = self._create_sub_element(shop, "currencies")  #
         for currency_id, rate in self.catalog.currencies.items():
             ET.SubElement(currencies_node, "currency", id=currency_id, rate=str(rate))
 
@@ -422,26 +443,27 @@ class XmlExporterKasta(BaseExporter):
                 self._create_sub_element(offer_node, "name_ua", offer.name_ua)
             if offer.name:
                 self._create_sub_element(offer_node, "name", offer.name)
-            
+
             self._create_sub_element(offer_node, "currencyId", offer.currency_id)
             self._create_sub_element(offer_node, "categoryId", str(offer.category_id))
             stock_quantity = offer.stock_quantity if offer.is_in_stock() else 0
             self._create_sub_element(offer_node, "stock_quantity", str(stock_quantity))
             self._create_sub_element(offer_node, "price", str(offer.price))
-            
-            
+
             for picture in offer.pictures:
                 self._create_sub_element(offer_node, "picture", picture)
-            
+
             self._create_sub_element(offer_node, "vendor", offer.vendor)
             self._create_sub_element(offer_node, "vendorcode", offer.article)
-            
-            if offer.description_ua:
-                 self._create_sub_element(offer_node, "description_ua", offer.description_ua, cdata=True)
-            if offer.description:
-                self._create_sub_element(offer_node, "description", offer.description, cdata=True)
 
-            
+            if offer.description_ua:
+                self._create_sub_element(
+                    offer_node, "description_ua", offer.description_ua, cdata=True
+                )
+            if offer.description:
+                self._create_sub_element(
+                    offer_node, "description", offer.description, cdata=True
+                )
 
             for param in offer.params:
                 if param.name.lower() in ["color", "колір"]:

@@ -140,7 +140,7 @@ class YmlParserRozetka:
             id=offer_element.get("id"),
             url=offer_element.findtext("url", ""),
             available=offer_element.get("available") == "true",
-            price=float(offer_element.findtext("price")),
+            price=float(offer_element.findtext("price_old")),
             currency_id=offer_element.findtext("currencyId"),
             category_id=offer_element.findtext("categoryId"),
             vendor=offer_element.findtext("vendor"),
