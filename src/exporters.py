@@ -401,8 +401,7 @@ class XmlExporterKasta(BaseExporter):
         # --- Currencies ---
         currencies_node = self._create_sub_element(shop, "currencies") #
         for currency_id, rate in self.catalog.currencies.items():
-            # _create_sub_element не підтримує атрибути, тому використовуємо ET.SubElement напряму
-            ET.SubElement(currencies_node, "currency", id=currency_id, rate=str(rate)) #
+            ET.SubElement(currencies_node, "currency", id=currency_id, rate=str(rate))
 
         # --- Categories ---
         categories_node = self._create_sub_element(shop, "categories")
@@ -415,38 +414,34 @@ class XmlExporterKasta(BaseExporter):
             cat_element.text = cat_name
 
         # --- Offers ---
-        offers_node = self._create_sub_element(shop, "offers") #
+        offers_node = self._create_sub_element(shop, "offers")
         for offer in self.catalog.offers:
-            offer_attributes = {
-                "id": str(offer.id),
-                "available": "true" if offer.is_in_stock() else "false",
-            }
-
-            offer_node = ET.SubElement(offers_node, "offer", **offer_attributes) #
-
-            self._create_sub_element(offer_node, "url", offer.url)
-            self._create_sub_element(offer_node, "price", str(offer.price)) #
-            self._create_sub_element(offer_node, "currencyId", offer.currency_id) #
-            self._create_sub_element(offer_node, "categoryId", str(offer.category_id)) #
-            
-            for picture in offer.pictures:
-                self._create_sub_element(offer_node, "picture", picture) #
+            offer_node = ET.SubElement(offers_node, "offer")
 
             if offer.name_ua:
                 self._create_sub_element(offer_node, "name_ua", offer.name_ua)
             if offer.name:
                 self._create_sub_element(offer_node, "name", offer.name)
             
+            self._create_sub_element(offer_node, "currencyId", offer.currency_id)
+            self._create_sub_element(offer_node, "categoryId", str(offer.category_id))
+            stock_quantity = offer.stock_quantity if offer.is_in_stock() else 0
+            self._create_sub_element(offer_node, "stock_quantity", str(stock_quantity))
+            self._create_sub_element(offer_node, "price", str(offer.price))
+            
+            
+            for picture in offer.pictures:
+                self._create_sub_element(offer_node, "picture", picture)
+            
             self._create_sub_element(offer_node, "vendor", offer.vendor)
-            self._create_sub_element(offer_node, "vendorCode", offer.article)
+            self._create_sub_element(offer_node, "vendorcode", offer.article)
             
             if offer.description_ua:
                  self._create_sub_element(offer_node, "description_ua", offer.description_ua, cdata=True)
             if offer.description:
                 self._create_sub_element(offer_node, "description", offer.description, cdata=True)
 
-            stock_quantity = offer.stock_quantity if offer.is_in_stock() else 0
-            self._create_sub_element(offer_node, "stock_quantity", str(stock_quantity))
+            
 
             for param in offer.params:
                 if param.name.lower() in ["color", "колір"]:

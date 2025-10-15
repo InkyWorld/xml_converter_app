@@ -1,13 +1,16 @@
 from pathlib import Path
 from typing import Optional
+from xml.etree.ElementTree import ParseError
 
-from lxml import etree
+import xmlschema
 
 from src.logger_config import app_logger
 
-class XsdValidator:
+
+class XmlSchemaValidator:
     """
-    Validates XML files against a pre-loaded and compiled XSD schema.
+    Validates XML files against a pre-loaded and compiled XSD schema
+    using the xmlschema library.
 
     This class is designed for efficiency and reusability. The XSD schema
     is parsed and compiled once during initialization. The validate() method
@@ -22,9 +25,9 @@ class XsdValidator:
             schema_path (Path): The file path to the XSD schema file.
         """
         self.schema_path = schema_path
-        self.xmlschema: Optional[etree.XMLSchema] = self._load_schema()
+        self.schema: Optional[xmlschema.XMLSchema11] = self._load_schema()
 
-    def _load_schema(self) -> Optional[etree.XMLSchema]:
+    def _load_schema(self) -> Optional[xmlschema.XMLSchema11]:
         """
         Parses and compiles the XSD schema file.
 
@@ -32,7 +35,7 @@ class XsdValidator:
         It handles schema file existence and parsing errors.
 
         Returns:
-            An etree.XMLSchema object if successful, otherwise None.
+            An xmlschema.XMLSchema object if successful, otherwise None.
         """
         if not self.schema_path.is_file():
             app_logger.error(
@@ -40,10 +43,11 @@ class XsdValidator:
             )
             return None
         try:
-            xmlschema_doc = etree.parse(str(self.schema_path))
-            return etree.XMLSchema(xmlschema_doc)
-        except etree.XMLSchemaParseError as e:
-            app_logger.error(f"\n[✗] CRITICAL ERROR: Failed to parse the XSD schema. Details: {e}")
+            return xmlschema.XMLSchema11(str(self.schema_path))
+        except xmlschema.XMLSchemaException as e:
+            app_logger.error(
+                f"\n[✗] CRITICAL ERROR: Failed to parse the XSD schema. Details: {e}"
+            )
             return None
 
     def validate(self, xml_path: Path) -> bool:
@@ -60,7 +64,7 @@ class XsdValidator:
             True if the XML file is valid, False otherwise.
         """
         # Check if the schema was loaded successfully
-        if self.xmlschema is None:
+        if self.schema is None:
             app_logger.error("[✗] VALIDATION SKIPPED: Schema was not loaded correctly.")
             return False
 
@@ -70,22 +74,23 @@ class XsdValidator:
             return False
 
         try:
-            xml_doc = etree.parse(str(xml_path))
-            # Validate using the pre-compiled schema
-            self.xmlschema.assertValid(xml_doc)
-            app_logger.info(f"[✓] SUCCESS: '{xml_path.name}' is valid.")
-            return True
+            # Use iter_errors to get all validation errors
+            validation_errors = list(self.schema.iter_errors(str(xml_path)))
 
-        except etree.DocumentInvalid:
-            app_logger.error(
-                f"[✗] VALIDATION FAILED: '{xml_path.name}' does not conform to the schema."
-            )
-            app_logger.error("Errors found:")
-            for error in self.xmlschema.error_log:
-                app_logger.error(f"  - Line {error.line}, Col {error.column}: {error.message}")
-            return False
+            if not validation_errors:
+                app_logger.info(f"[✓] SUCCESS: '{xml_path.name}' is valid.")
+                return True
+            else:
+                app_logger.error(
+                    f"[✗] VALIDATION FAILED: '{xml_path.name}' does not conform to the schema."
+                )
+                app_logger.error("Errors found:")
+                for error in validation_errors:
+                    location = f"Line {error.sourceline}" if hasattr(error, 'sourceline') and error.sourceline is not None else "Location unknown"
+                    app_logger.error(f"  - {location}: {error.reason} (Path: {error.path})")
+                return False
 
-        except etree.XMLSyntaxError as e:
+        except ParseError as e:
             app_logger.error(
                 f"[✗] VALIDATION FAILED: '{xml_path.name}' has syntax errors and cannot be parsed. Details: {e}"
             )
