@@ -51,7 +51,7 @@ class XmlExporterIntimo(BaseExporter):
         for offer in self.catalog.offers:
             if offer.article:
                 self.article_groups[offer.article].append(offer)
-
+        
         # 1. Collect unique brands
         for offer in self.catalog.offers:
             if offer.vendor and offer.vendor not in self.brand_map:
@@ -214,7 +214,7 @@ class XmlExporterIntimo(BaseExporter):
             # Extract materials from offer parameters
             materials = "Composition not specified"
             for param in main_offer.params:
-                if param.name.lower() in ["склад тканини"]:
+                if param.name.lower() in ["склад тканини", "матеріал", "materials", "состав ткани"]:
                     materials = str(param.value)
                     break
 
@@ -289,16 +289,12 @@ class XmlExporterIntimo(BaseExporter):
             color_slug_id = "NULL"
             size = "one-size"
 
-            req = True
             for param in offer_variation.params:
                 param_name_lower = param.name.lower()
                 if param_name_lower in ["колір", "color", "цвет"]:
                     color_slug_id = self.color_map.get(str(param.value))
-                    req = False
                 elif param_name_lower in ["зріст", "розмір", "size"]:
                     size = str(param.value)
-            if req:
-                print(f"123{offer_variation}")
             variation_node = self._create_sub_element(variations_node, "variation")
 
             # Generate unique variation ID based on offer ID, color, and size
