@@ -91,11 +91,9 @@
 
       <xs:element name="description" type="xs:string" minOccurs="0"/>
       <xs:element name="description_ua" type="xs:string" minOccurs="0"/>
-    </xs:all>
-    
-    <xs:sequence>
+      
       <xs:element name="picture" type="xs:anyURI" minOccurs="1" maxOccurs="20"/>
-      <xs:element name="param" minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="param" minOccurs="0" maxOccurs="unbounded"> 
         <xs:complexType>
           <xs:simpleContent>
             <xs:extension base="xs:string">
@@ -104,21 +102,20 @@
           </xs:simpleContent>
         </xs:complexType>
       </xs:element>
-    </xs:sequence>
+    </xs:all>
 
-  <xs:assert test="count(stock_quantity | quantity_in_stock | stock) &lt;= 1"
+    <xs:assert test="count(stock_quantity | quantity_in_stock | stock) &lt;= 1"
               xpathDefaultNamespace="##local"/>
-  <xs:assert test="count(price_old | old_price) &lt;= 1"
+    <xs:assert test="count(price_old | old_price) &lt;= 1"
               xpathDefaultNamespace="##local"/>
-  <xs:assert test="count(price_promo | promo_price | promo_new_price) &lt;= 1"
+    <xs:assert test="count(price_promo | promo_price | promo_new_price) &lt;= 0"
               xpathDefaultNamespace="##local"/>
-  <xs:assert test="count(vendorcode | article) = 1"
+    <xs:assert test="count(vendorcode | article) = 1"
               xpathDefaultNamespace="##local"/>
-  <xs:assert test="count(description | description_ua) &lt;= 1"
+    <xs:assert test="count(description | description_ua) &lt;= 1"
               xpathDefaultNamespace="##local"/>
-  
-  <xs:assert test="param[@name='Розмір'] and param[@name='Колір']"
+    <xs:assert test="param[@name='Розмір'] and param[@name='Колір']"
               xpathDefaultNamespace="##local"/>
-</xs:complexType>
+  </xs:complexType>
 
 </xs:schema>

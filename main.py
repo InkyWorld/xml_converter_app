@@ -4,7 +4,7 @@ from typing import List, Tuple
 
 from src.config import INPUT_DIR, OUTPUT_DIR, INTIMO_VALIDATION_SCHEMA_FILE, KASTA_VALIDATION_SCHEMA_FILE
 from src.parser import YmlParserRozetka
-from schemas import data_schema
+from src.schemas import data_schema
 from src.exporters import XmlExporterIntimo, XmlExporterKasta
 from src.logger_config import app_logger
 from validators.xsd_validator import XmlSchemaValidator
@@ -78,15 +78,20 @@ def main():
         )
     for catalog_path, catalog in all_parsed_catalogs:
         try:
+            # exporterIntimo = XmlExporterIntimo(catalog=catalog)
+            # output_file_path = OUTPUT_DIR / f"{catalog_path}_intimo.xml"
+            # exporterIntimo.export(str(output_file_path))
+            # validator_intimo.validate(xml_path=Path(output_file_path))
+
+            # exporterKasta = XmlExporterKasta(catalog=catalog)
+            # output_file_path = OUTPUT_DIR / f"{catalog_path}_kasta.xml"
+            # exporterKasta.export(str(output_file_path))
+            # validator_kasta.validate(xml_path=Path(output_file_path))
+
             exporterIntimo = XmlExporterIntimo(catalog=catalog)
             output_file_path = OUTPUT_DIR / f"{catalog_path}_intimo.xml"
             exporterIntimo.export(str(output_file_path))
             validator_intimo.validate(xml_path=Path(output_file_path))
-
-            exporterKasta = XmlExporterKasta(catalog=catalog)
-            output_file_path = OUTPUT_DIR / f"{catalog_path}_kasta.xml"
-            exporterKasta.export(str(output_file_path))
-            validator_kasta.validate(xml_path=Path(output_file_path))
 
         except Exception as e:
             app_logger.error(f"Unexpected error during export: {e}")

@@ -236,9 +236,9 @@
                         <xs:element name="country" type="xs:string" minOccurs="0"/>
                         <xs:element name="materials" type="xs:string"/>
                         <xs:element name="link" type="xs:anyURI" minOccurs="0"/>
-                        <xs:element name="price" type="xs:integer"/>
-                        <xs:element name="price_r" type="xs:integer"/>
-                        <xs:element name="price_w" type="xs:integer"/>
+                        <xs:element name="price" type="xs:decimal"/>
+                        <xs:element name="price_r" type="xs:decimal"/>
+                        <xs:element name="price_w" type="xs:decimal"/>
                         <xs:element name="currency_price" type="currencyType" minOccurs="0"/>
                         <xs:element name="currency_price_r" type="currencyType" minOccurs="0"/>
                         <xs:element name="currency_price_w" type="currencyType" minOccurs="0"/>
