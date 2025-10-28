@@ -3,11 +3,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 
-from lxml import etree as ET # type: ignore
+from lxml import etree as ET  # type: ignore
 
 from ..schemas import data_schema
 from src.logger_config import app_logger
 from .base import BaseExporter
+
 
 class XmlExporterIntimo(BaseExporter):
     """
@@ -51,7 +52,7 @@ class XmlExporterIntimo(BaseExporter):
         for offer in self.catalog.offers:
             if offer.article:
                 self.article_groups[offer.article].append(offer)
-        
+
         # 1. Collect unique brands
         for offer in self.catalog.offers:
             if offer.vendor and offer.vendor not in self.brand_map:
@@ -70,7 +71,6 @@ class XmlExporterIntimo(BaseExporter):
             for param in offer.params:
                 if param.name.lower() in ["колір", "color"] and param.value:
                     color_name = param.value.strip().lower()
-
                     if color_name not in self.color_map:
                         key = str(len(self.color_map) + 1)
                         self.color_map[color_name] = key
@@ -214,7 +214,12 @@ class XmlExporterIntimo(BaseExporter):
             # Extract materials from offer parameters
             materials = "Composition not specified"
             for param in main_offer.params:
-                if param.name.lower() in ["склад тканини", "матеріал", "materials", "состав ткани"]:
+                if param.name.lower() in [
+                    "склад тканини",
+                    "матеріал",
+                    "materials",
+                    "состав ткани",
+                ]:
                     materials = str(param.value)
                     break
 
@@ -255,6 +260,7 @@ class XmlExporterIntimo(BaseExporter):
                 img_node = self._create_sub_element(item_node, "image_link", pic_url)
 
                 # Attempt to associate color with image
+
                 color_slug_id_for_pic = None
                 for offer_in_group in offer_group:
                     if pic_url in offer_in_group.pictures:

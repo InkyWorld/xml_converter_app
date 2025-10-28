@@ -135,12 +135,14 @@ class YmlParserRozetka:
             params_data.append(data_schema.Param(name=param_name, value=param_value))
 
         stock = offer_element.findtext("stock_quantity")
-        price = float(offer_element.findtext("price_old")) if offer_element.findtext("price_old") else float(offer_element.findtext("price"))
+        price_old = float(offer_element.findtext("price_old")) if offer_element.findtext("price_old") else float(offer_element.findtext("price"))
+        discount_price = float(offer_element.findtext("price")) if float(offer_element.findtext("price")) else float(offer_element.findtext("price"))
         return data_schema.Offer(
             id=offer_element.get("id"),
             url=offer_element.findtext("url", ""),
             available=offer_element.get("available") == "true",
-            price=price,
+            price=price_old,
+            discount_price=discount_price,
             currency_id=offer_element.findtext("currencyId"),
             category_id=offer_element.findtext("categoryId"),
             vendor=offer_element.findtext("vendor"),

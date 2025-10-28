@@ -12,6 +12,7 @@ class Offer:
     url: str
     available: bool
     price: float
+    discount_price: float
     currency_id: str
     category_id: str
     vendor: Optional[str]
