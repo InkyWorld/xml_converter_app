@@ -2,12 +2,17 @@ import os
 from pathlib import Path
 from typing import List, Tuple
 
-from src.config import INPUT_DIR, OUTPUT_DIR, INTIMO_VALIDATION_SCHEMA_FILE, KASTA_VALIDATION_SCHEMA_FILE
+from src.config import (
+    INPUT_DIR,
+    OUTPUT_DIR,
+    INTIMO_VALIDATION_SCHEMA_FILE,
+    KASTA_VALIDATION_SCHEMA_FILE,
+)
 from src.parser import YmlParserRozetka
 from src.schemas import data_schema
-from src.exporters import XmlExporterIntimo, XmlExporterKasta
+from src.exporters import XmlExporterIntimo, XmlExporterKasta, ExporterIntertop
 from src.logger_config import app_logger
-from validators.xsd_validator import XmlSchemaValidator
+from src.validators.xsd_validator import XmlSchemaValidator
 
 
 def process_folder(folder_path: Path) -> List[Tuple[str, data_schema.XmlCatalog]]:
@@ -40,6 +45,7 @@ def process_folder(folder_path: Path) -> List[Tuple[str, data_schema.XmlCatalog]
 
     return catalogs
 
+
 def transform(input_file: str, output_file: str) -> bool:
     try:
         parser = YmlParserRozetka(file_path=input_file)
@@ -55,6 +61,7 @@ def transform(input_file: str, output_file: str) -> bool:
     except Exception as e:
         app_logger.error(f"Error during transformation: {e}")
         return False
+
 
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -88,10 +95,9 @@ def main():
             # exporterKasta.export(str(output_file_path))
             # validator_kasta.validate(xml_path=Path(output_file_path))
 
-            exporterIntimo = XmlExporterIntimo(catalog=catalog)
-            output_file_path = OUTPUT_DIR / f"{catalog_path}_intimo.xml"
-            exporterIntimo.export(str(output_file_path))
-            validator_intimo.validate(xml_path=Path(output_file_path))
+            exporterIntertop = ExporterIntertop(catalog=catalog)
+            # exporterIntertop.update_product_price()
+            exporterIntertop.update_intertop()
 
         except Exception as e:
             app_logger.error(f"Unexpected error during export: {e}")

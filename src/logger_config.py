@@ -20,3 +20,5 @@ file_handler.setFormatter(file_formatter)
 
 if not app_logger.hasHandlers():
     app_logger.addHandler(file_handler)
+
+logging.getLogger("httpx").setLevel(logging.WARNING)
