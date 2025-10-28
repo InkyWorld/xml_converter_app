@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 import csv
 import os
 import pickle
-from typing import Dict
+from typing import Dict, List, Set, Tuple
 
 import httpx
 from tqdm.asyncio import tqdm
@@ -114,11 +114,13 @@ class ExporterIntertop:
                     f.write(article + "\n")
                     app_logger.warning(f"артикля {article} немає в розетці")
 
-    def update_intertop(self):
-        if not self.article_uniq_groups:
-            self._prepare_data_maps()
-
-        all_products = dict(
+    def _categorize_intertop_products(self) -> dict:
+        """
+        Аналізує self.products та self.catalog.offers,
+        повертаючи словник зі згрупованими артикулами.
+        """
+        app_logger.info("Categorizing products...")
+        all_products_map = dict(
             (product.get("vendor_code"), product.get("article"))
             for product in self.products
         )
@@ -130,11 +132,13 @@ class ExporterIntertop:
             not in ("uploaded", "moderate", "approved", "not_approved")
         )
         vendorCodes_not_uploaded = set(vendorCodes_articles_not_uploaded.keys())
+
         vendorCodes_draft = list(
             product.get("vendor_code")
             for product in self.products
             if product.get("status", {}).get("code") == "draft"
         )
+
         vendorCodes_not_approved = set(
             product.get("vendor_code")
             for product in self.products
@@ -160,16 +164,8 @@ class ExporterIntertop:
             article
             for offer in self.catalog.offers
             if (article := offer.article)
-            not in {product.get("vendor_code") for product in self.products}
+            not in all_products_map.keys()
         }
-
-        articles_to_archive = set(
-            vendorCodes_only_on_intertop
-            - vendorCodes_not_uploaded
-        )
-        for item in articles_to_archive:
-            vendorCodes_draft.append(item)
-            change_product_status(all_products.get(item), self.bearer, "draft")
 
         articles_moderate = tuple(
             product.get("article")
@@ -177,11 +173,64 @@ class ExporterIntertop:
             if product.get("status", {}).get("code") == "moderate"
         )
 
-        articles_to_moderate = set()
+        return {
+            "all_products_map": all_products_map,
+            "vendorCodes_not_uploaded": vendorCodes_not_uploaded,
+            "vendorCodes_draft": vendorCodes_draft,
+            "vendorCodes_only_on_intertop": vendorCodes_only_on_intertop,
+            "articles_only_on_rozetka": articles_only_on_rozetka,
+            "articles_moderate": articles_moderate,
+        }
 
+    def _handle_product_status_changes(
+        self, categorized_products: dict
+    ) -> Tuple[Set[str], List[str]]:
+        """
+        Переводить старі продукти та "moderate" у "draft"
+        для підготовки до оновлення.
+        """
+        app_logger.info("Handling product status changes (archiving and moderation)...")
+        # Розпакування
+        all_products_map = categorized_products["all_products_map"]
+        vendorCodes_only_on_intertop = categorized_products[
+            "vendorCodes_only_on_intertop"
+        ]
+        vendorCodes_not_uploaded = categorized_products["vendorCodes_not_uploaded"]
+        vendorCodes_draft = categorized_products["vendorCodes_draft"]
+        articles_moderate = categorized_products["articles_moderate"]
+
+        # 1. Архівування (переведення в draft)
+        articles_to_archive = set(
+            vendorCodes_only_on_intertop - vendorCodes_not_uploaded
+        )
+        for item in articles_to_archive:
+            vendorCodes_draft.append(item)
+            change_product_status(all_products_map.get(item), self.bearer, "draft")
+
+        # 2. Підготовка продуктів на модерації
+        articles_to_moderate_set = set()
         for article in articles_moderate:
-            articles_to_moderate.add(article)
+            articles_to_moderate_set.add(article)
             change_product_status(article, self.bearer, "draft")
+
+        return articles_to_moderate_set, vendorCodes_draft
+
+    def _prepare_offer_updates(
+        self,
+        categorized_products: dict,
+        articles_to_moderate: Set[str],
+        vendorCodes_draft: List[str],
+    ) -> Tuple[List[tuple], Set[tuple]]:
+        """
+        Головний цикл по self.catalog.offers.
+        Готує списки завдань для оновлення оферів.
+        Модифікує articles_to_moderate та vendorCodes_draft!
+        """
+        app_logger.info("Preparing offer updates (main loop)...")
+        # Розпакування
+        all_products_map = categorized_products["all_products_map"]
+        articles_only_on_rozetka = categorized_products["articles_only_on_rozetka"]
+        vendorCodes_not_uploaded = categorized_products["vendorCodes_not_uploaded"]
 
         used_article_sizeID_mapping = set()
         update_offer_task_args = []
@@ -197,11 +246,11 @@ class ExporterIntertop:
                     f"vendor code that status is not uploaded {offer.article}"
                 )
                 if offer.article not in articles_to_moderate:
-                    articles_to_moderate.add(all_products.get(offer.article))
+                    articles_to_moderate.add(all_products_map.get(offer.article))
                 if offer.article not in vendorCodes_draft:
                     vendorCodes_draft.append(offer.article)
                     change_product_status(
-                        all_products.get(offer.article), self.bearer, "draft"
+                        all_products_map.get(offer.article), self.bearer, "draft"
                     )
             for param in offer.params:
                 if param.name in ["розмір", "size", "зріст"]:
@@ -216,7 +265,7 @@ class ExporterIntertop:
                         break
 
                     data = self.article_sizeID_mapping.get(
-                        (all_products.get(offer.article), intertop_size_id),
+                        (all_products_map.get(offer.article), intertop_size_id),
                         (None, None, None, None, None, None),
                     )
                     (
@@ -229,7 +278,7 @@ class ExporterIntertop:
                     ) = data
                     if barcode:
                         used_article_sizeID_mapping.add(
-                            (all_products.get(offer.article), intertop_size_id)
+                            (all_products_map.get(offer.article), intertop_size_id)
                         )
                         if not (
                             offer.price == base_price_amount
@@ -240,7 +289,7 @@ class ExporterIntertop:
                             update_offer_task_args.append(
                                 (
                                     self.bearer,
-                                    all_products.get(offer.article),
+                                    all_products_map.get(offer.article),
                                     barcode,
                                     offer.price,
                                     offer.discount_price,
@@ -256,18 +305,39 @@ class ExporterIntertop:
 
                         # створення офера для сайз ид
                         break
-        if update_offer_task_args:
-            app_logger.info(f"Found {len(update_offer_task_args)} offers to update.")
-            try:
-                asyncio.run(
-                    run_all_offer_updates(
-                        update_offer_task_args, "Updating offers prices and quantities"
-                    )
-                )
-            except RuntimeError as e:
-                app_logger.critical(
-                    f"Asyncio error: {e}. Event loop might be already running!"
-                )
+
+        return update_offer_task_args, used_article_sizeID_mapping
+
+    def _run_async_updates(
+        self, tasks_args_list: list, task_description: str = "Updating offers"
+    ):
+        """
+        Обертка для запуску asyncio.run(run_all_offer_updates(...))
+        з обробкою RuntimeError.
+        """
+        if not tasks_args_list:
+            app_logger.info(f"No tasks to run for '{task_description}'.")
+            return
+
+        app_logger.info(f"Found {len(tasks_args_list)} tasks for '{task_description}'.")
+        try:
+            asyncio.run(
+                run_all_offer_updates(tasks_args_list, task_description)
+            )
+        except RuntimeError as e:
+            app_logger.critical(
+                f"Asyncio error: {e}. Event loop might be already running!"
+            )
+
+    def _prepare_offer_deactivations(
+        self, used_article_sizeID_mapping: set
+    ) -> List[tuple]:
+        """
+        Готує список завдань для деактивації оферів,
+        яких більше немає в каталозі.
+        """
+        app_logger.info("Preparing offer deactivations...")
+        # Оновлюємо список продуктів, щоб отримати актуальні статуси
         self.products = get_products(self.bearer)
         vendorCodes_articles_not_uploaded = set(
             product.get("article")
@@ -275,17 +345,20 @@ class ExporterIntertop:
             if product.get("status", {}).get("code")
             not in ("uploaded", "moderate", "approved", "not_approved")
         )
+
         existing_keys = set(self.article_sizeID_mapping.keys())
         not_updated_offers_keys = [
             item
             for item in existing_keys.difference(used_article_sizeID_mapping)
             if item[0] not in vendorCodes_articles_not_uploaded
         ]
+
         inactive_barcodes = [
             item[0]
             for item in self.article_sizeID_mapping.values()
             if item[4] is False and item[3] != "archived"
         ]
+
         deactivate_offer_task_args = []
         for offer_key in not_updated_offers_keys:
             # set activity, quantity = False, 0
@@ -297,6 +370,7 @@ class ExporterIntertop:
                 offer_activity,
                 quantity,
             ) = self.article_sizeID_mapping.get((offer_key[0], offer_key[1]))
+
             if barcode not in inactive_barcodes:
                 deactivate_offer_task_args.append(
                     (
@@ -309,19 +383,49 @@ class ExporterIntertop:
                         False,
                     )
                 )
-        if deactivate_offer_task_args:
-            app_logger.info(
-                f"Found {len(deactivate_offer_task_args)} offers to deactivate."
-            )
-            try:
-                asyncio.run(
-                    run_all_offer_updates(
-                        deactivate_offer_task_args, "Deactivating offers"
-                    )
-                )
-            except RuntimeError as e:
-                app_logger.critical(f"Asyncio error: {e}.")
+        return deactivate_offer_task_args
 
+    def _finalize_status_updates(self, articles_to_moderate: set):
+        """
+        Повертає продукти, що були на модерації,
+        назад у статус 'moderate'.
+        """
+        app_logger.info(f"Returning {len(articles_to_moderate)} articles to 'moderate' status.")
         for article in articles_to_moderate:
             change_product_status(article, self.bearer, "moderate")
+
+    def update_intertop(self):
+        """
+        Головний метод-координатор для повного оновлення Intertop.
+        """
+        if not self.article_uniq_groups:
+            self._prepare_data_maps()
+
+        # 1. Аналізуємо поточний стан продуктів
+        categorized_products = self._categorize_intertop_products()
+
+        # 2. Переводить старі продукти та "moderate" у "draft"
+        (
+            articles_to_moderate,
+            vendorCodes_draft,
+        ) = self._handle_product_status_changes(categorized_products)
+
+        # 3. Готуємо список оферів на оновлення
+        # (Цей метод МОДИФІКУЄ articles_to_moderate та vendorCodes_draft)
+        update_args, used_keys = self._prepare_offer_updates(
+            categorized_products, articles_to_moderate, vendorCodes_draft
+        )
+
+        # 4. Виконуємо асинхронне оновлення
+        self._run_async_updates(update_args, "Updating offers prices and quantities")
+
+        # 5. Готуємо список оферів на деактивацію
+        deactivate_args = self._prepare_offer_deactivations(used_keys)
+
+        # 6. Виконуємо асинхронну деактивацію
+        self._run_async_updates(deactivate_args, "Deactivating offers")
+
+        # 7. Повертаємо продукти на модерацію
+        self._finalize_status_updates(articles_to_moderate)
+
         app_logger.info("Intertop update completed.")
