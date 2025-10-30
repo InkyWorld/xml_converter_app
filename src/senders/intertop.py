@@ -1,30 +1,18 @@
 import asyncio
-import csv
-import json
 import logging
-import os
-from abc import ABC, abstractmethod
-from collections import defaultdict
-from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Optional, Tuple
 
 import httpx
 import requests
 from tqdm import tqdm
 
 from src.config import BASE_LINK_INTERTOP
+if not BASE_LINK_INTERTOP:
+    raise ValueError("BASE_LINK_INTERTOP is not set in config.py")
 
-# --- MOCK LOGGER ---
-# Спрощена версія логера, щоб уникнути імпорту з вашого проєкту
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
 app_logger = logging.getLogger(__name__)
 
-
-# --- DATA SCHEMA (з вашого файлу schemas/data_schema.py) ---
-# Включаємо необхідні класи прямо сюди, щоб файл був самодостатнім
 class RequestMethod(Enum):
     GET = "get"
     POST = "post"
@@ -380,6 +368,8 @@ def get_product_articles(bearer):
         response = make_request(
             BASE_LINK_INTERTOP + "products", bearer=bearer, params=params
         )
+        if response is None:
+            break
         items = response.get("data", {}).get("items", [])
         if not items:
             break
@@ -401,6 +391,8 @@ def get_products(bearer):
         response = make_request(
             BASE_LINK_INTERTOP + "products", bearer=bearer, params=params
         )
+        if response is None:
+            break
         items = response.get("data", {}).get("items", [])
         if not items:
             break

@@ -1,14 +1,6 @@
 import asyncio
-import concurrent.futures
-from concurrent.futures import as_completed
-from concurrent.futures import ThreadPoolExecutor
 import csv
-import os
-import pickle
 from typing import Dict, List, Set, Tuple
-
-import httpx
-from tqdm.asyncio import tqdm
 
 from src.config import (
     BASE_LINK_INTERTOP,
@@ -18,21 +10,13 @@ from src.config import (
 )
 from src.logger_config import app_logger
 from src.senders.intertop import (
-    auth,
-    get_product_articles,
-    archive_offer_and_quantity_zero,
-    get_offers_data_by_articles,
-    get_product_offers,
-    change_product_activity,
-    get_product_offers_async,
-    get_products,
-    update_offer,
-    update_offers_prices,
-    change_product_status,
-    updating_product_price,
-    update_offers_quantity,
-    run_all_offer_updates,
     async_load_wrapper,
+    auth,
+    change_product_status,
+    get_product_articles,
+    get_products,
+    run_all_offer_updates,
+    updating_product_price,
 )
 from ..schemas import data_schema
 
@@ -51,7 +35,7 @@ class ExporterIntertop:
             str(DATA_DIR / "sizes_id_intertop.csv")
         )
         self.bearer = auth(
-            BASE_LINK_INTERTOP + "auth",
+            str(BASE_LINK_INTERTOP) + "auth",
             INTERTOP_APLICATION_KEY,
             INTERTOP_APLICATION_SECRET,
         )[0]
@@ -156,15 +140,12 @@ class ExporterIntertop:
             if (article := product.get("vendor_code"))
             not in self.article_uniq_groups.keys()
         )
-        vendorCodes_only_on_intertop = set(
-            vendorCodes_articles_only_on_intertop.keys()
-        )
+        vendorCodes_only_on_intertop = set(vendorCodes_articles_only_on_intertop.keys())
 
         articles_only_on_rozetka = {
             article
             for offer in self.catalog.offers
-            if (article := offer.article)
-            not in all_products_map.keys()
+            if (article := offer.article) not in all_products_map.keys()
         }
 
         articles_moderate = tuple(
@@ -248,7 +229,7 @@ class ExporterIntertop:
                 if offer.article not in articles_to_moderate:
                     articles_to_moderate.add(all_products_map.get(offer.article))
                 if offer.article not in vendorCodes_draft:
-                    vendorCodes_draft.append(offer.article)
+                    vendorCodes_draft.append(str(offer.article))
                     change_product_status(
                         all_products_map.get(offer.article), self.bearer, "draft"
                     )
@@ -256,7 +237,7 @@ class ExporterIntertop:
                 if param.name in ["розмір", "size", "зріст"]:
                     rozetka_size_value = param.value
                     intertop_size_id, intertop_size_value = self.size_intertop_mapping(
-                        rozetka_size_value
+                        str(rozetka_size_value)
                     )
                     if not intertop_size_id:
                         app_logger.warning(
@@ -321,9 +302,7 @@ class ExporterIntertop:
 
         app_logger.info(f"Found {len(tasks_args_list)} tasks for '{task_description}'.")
         try:
-            asyncio.run(
-                run_all_offer_updates(tasks_args_list, task_description)
-            )
+            asyncio.run(run_all_offer_updates(tasks_args_list, task_description))
         except RuntimeError as e:
             app_logger.critical(
                 f"Asyncio error: {e}. Event loop might be already running!"
@@ -369,7 +348,9 @@ class ExporterIntertop:
                 product_status,
                 offer_activity,
                 quantity,
-            ) = self.article_sizeID_mapping.get((offer_key[0], offer_key[1]))
+            ) = self.article_sizeID_mapping.get(
+                (offer_key[0], offer_key[1]), (None, None, None, None, None, None)
+            )
 
             if barcode not in inactive_barcodes:
                 deactivate_offer_task_args.append(
@@ -390,7 +371,9 @@ class ExporterIntertop:
         Повертає продукти, що були на модерації,
         назад у статус 'moderate'.
         """
-        app_logger.info(f"Returning {len(articles_to_moderate)} articles to 'moderate' status.")
+        app_logger.info(
+            f"Returning {len(articles_to_moderate)} articles to 'moderate' status."
+        )
         for article in articles_to_moderate:
             change_product_status(article, self.bearer, "moderate")
 

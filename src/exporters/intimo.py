@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-from lxml import etree as ET
+from lxml import etree as ET # type: ignore
 
 from src.config import DATA_DIR  # type: ignore
 
@@ -68,7 +68,7 @@ class XmlExporterIntimo(BaseExporter):
             if offer.category_id not in self.collection_to_brand_map and offer.vendor:
                 brand_id = self.brand_map.get(offer.vendor)
                 if brand_id:
-                    self.collection_to_brand_map[offer.category_id] = brand_id
+                    self.collection_to_brand_map[int(offer.category_id)] = brand_id
 
         # 3. Collect all colors
         with open(str(DATA_DIR / "colors_intimo.csv"), newline="", encoding="utf-8") as csvfile:
@@ -272,10 +272,10 @@ class XmlExporterIntimo(BaseExporter):
             color_id = ""
             for param in main_offer.params:
                 if param.name.lower() in ["колір", "color", "цвет"]:
-                    param_value = str(param.value.lower())
+                    param_value = str(param.value).lower()
                     colorId_colorCode = self.color_map.get(param_value)
                     if not colorId_colorCode:
-                        app_logger.warning(f"Color not found for image {pic_url=} in article {article=} {main_offer.id=} {param.value=}")
+                        app_logger.warning(f"Color not found for in article {article=} {main_offer.id=} {param.value=}")
             if colorId_colorCode:
                 color_id = colorId_colorCode[0]
 
@@ -306,7 +306,7 @@ class XmlExporterIntimo(BaseExporter):
             for param in offer_variation.params:
                 param_name_lower = param.name.lower()
                 if param_name_lower in ["колір", "color", "цвет"]:
-                    colorId_colorCode = self.color_map.get(str(param.value.lower()))
+                    colorId_colorCode = self.color_map.get(str(param.value).lower())
                     if not colorId_colorCode:
                         app_logger.warning(f"Color not found {str(param.value)}")
                     else:

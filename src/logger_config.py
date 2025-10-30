@@ -4,8 +4,9 @@ from .config import BASE_DIR
 
 app_logger = logging.getLogger("xml_converter_app")
 app_logger.setLevel(logging.DEBUG)
-
-log_dir = BASE_DIR / "logs"
+if not BASE_DIR:
+    raise ValueError("BASE_DIR is not set in config.py")
+log_dir = BASE_DIR.joinpath("logs")
 log_dir.mkdir(exist_ok=True)
 log_file_path = log_dir / "logfile.log"
 

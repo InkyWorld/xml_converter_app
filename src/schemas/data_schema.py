@@ -8,7 +8,7 @@ class Param:
 
 @dataclass
 class Offer:
-    id: int
+    id: str
     url: str
     available: bool
     price: float
