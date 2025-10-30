@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:vc="http://www.w3.org/2007/XMLSchema-versioning"
+           vc:minVersion="1.1">
     <xs:element name="shop">
         <xs:complexType>
             <xs:sequence>
@@ -25,8 +27,8 @@
             <xs:selector xpath="lines/line"/>
             <xs:field xpath="id"/>
         </xs:key>
-        <xs:key name="colorKey">
-            <xs:selector xpath="colors/color"/>
+        <xs:key name="colorKeyAllowDuplicate">
+            <xs:selector xpath="shop/colors/color"/>
             <xs:field xpath="id"/>
         </xs:key>
 
@@ -42,29 +44,21 @@
             <xs:selector xpath="items/item"/>
             <xs:field xpath="line_id"/>
         </xs:keyref>
-        <xs:keyref name="imageColorRef" refer="colorKey">
-            <xs:selector xpath="items/item/image_link"/>
+        <xs:keyref name="imageColorRef" refer="colorKeyAllowDuplicate">
+            <xs:selector xpath="shop/items/item/image_link"/>
             <xs:field xpath="@color"/>
         </xs:keyref>
-        <xs:keyref name="variationColorRef" refer="colorKey">
-            <xs:selector xpath="items/item/variations/variation"/>
+        <xs:keyref name="variationColorRef" refer="colorKeyAllowDuplicate">
+            <xs:selector xpath="shop/items/item/variations/variation"/>
             <xs:field xpath="color"/>
         </xs:keyref>
     </xs:element>
 
-    <xs:simpleType name="currencyType">
-        <xs:restriction base="xs:string">
-            <xs:enumeration value="UAH"/>
-            <xs:enumeration value="EUR"/>
-            <xs:enumeration value="USD"/>
-        </xs:restriction>
-    </xs:simpleType>
-    
     <xs:simpleType name="discountType">
         <xs:restriction base="xs:decimal">
             <xs:fractionDigits value="6"/>
             <xs:minInclusive value="0"/>
-            <xs:maxInclusive value="99.999999"/>
+            <xs:maxInclusive value="100.00"/>
         </xs:restriction>
     </xs:simpleType>
 
@@ -83,8 +77,8 @@
     <xs:complexType name="StoreType">
         <xs:sequence>
             <xs:element name="title" type="xs:string"/>
-            <xs:element name="description" type="xs:string" minOccurs="0"/>
-            <xs:element name="link" type="xs:anyURI" minOccurs="0"/>
+            <xs:element name="description" type="xs:string"/>
+            <xs:element name="link" type="xs:anyURI"/>
         </xs:sequence>
     </xs:complexType>
 
@@ -232,20 +226,14 @@
                         <xs:element name="title" type="xs:string"/>
                         <xs:element name="description" type="xs:string" minOccurs="0"/>
                         <xs:element name="description_ua" type="xs:string"/>
-                        <xs:element name="country" type="xs:string" minOccurs="0"/>
                         <xs:element name="materials" type="xs:string"/>
                         <xs:element name="link" type="xs:anyURI" minOccurs="0"/>
                         <xs:element name="price" type="xs:decimal"/>
                         <xs:element name="price_r" type="xs:decimal"/>
                         <xs:element name="price_w" type="xs:decimal"/>
-                        <xs:element name="discount" type="xs:decimal"/>
-                        <xs:element name="discount_w" type="xs:decimal"/>
-                        <xs:element name="currency_price" type="currencyType" minOccurs="0"/>
-                        <xs:element name="currency_price_r" type="currencyType" minOccurs="0"/>
-                        <xs:element name="currency_price_w" type="currencyType" minOccurs="0"/>
-                        <xs:element name="discount" type="discountType" minOccurs="0"/>
-                        <xs:element name="discount_w" type="discountType" minOccurs="0"/>
-                        <xs:element name="image_link" type="ImageLinkType" minOccurs="1" maxOccurs="unbounded"/>
+                        <xs:element name="discount" type="discountType"/>
+                        <xs:element name="discount_w" type="discountType"/>
+                        <xs:element name="image_link" type="ImageLinkType" maxOccurs="unbounded"/>
                         <xs:element name="variations">
                             <xs:complexType>
                                 <xs:sequence>
@@ -262,15 +250,6 @@
                                                 </xs:element>
                                                 <xs:element name="size" type="xs:string"/>
                                                 <xs:element name="stock_quantity" type="xs:nonNegativeInteger"/>
-                                                <xs:element name="ean" type="xs:string" minOccurs="0"/>
-                                                <xs:element name="price" type="xs:integer" minOccurs="0"/>
-                                                <xs:element name="price_r" type="xs:integer" minOccurs="0"/>
-                                                <xs:element name="price_w" type="xs:integer" minOccurs="0"/>
-                                                <xs:element name="currency_price" type="currencyType" minOccurs="0"/>
-                                                <xs:element name="currency_price_r" type="currencyType" minOccurs="0"/>
-                                                <xs:element name="currency_price_w" type="currencyType" minOccurs="0"/>
-                                                <xs:element name="discount" type="discountType" minOccurs="0"/>
-                                                <xs:element name="discount_w" type="discountType" minOccurs="0"/>
                                             </xs:sequence>
                                         </xs:complexType>
                                     </xs:element>
