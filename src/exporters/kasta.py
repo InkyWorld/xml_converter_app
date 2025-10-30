@@ -27,7 +27,7 @@ class XmlExporterKasta(BaseExporter):
         """
         mapping = {}
         # Шлях до файлу відносно кореня проєкту
-        file_path = DATA_DIR / "name_rzid.csv"
+        file_path = DATA_DIR / "name_rzid_kasta.csv"
 
         try:
             with open(file_path, mode="r", encoding="utf-8") as infile:

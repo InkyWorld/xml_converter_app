@@ -155,6 +155,33 @@ def updating_product_price(
     )
     return response
 
+def create_product(
+    article,
+    bearer,
+    base_price_amount,
+    discount_price_amount,
+    activity
+):
+    payload = {
+        "active": activity,
+        "base_price": {
+            "amount": base_price_amount,
+            "currency": "UAH",
+        },
+        "discount_price": {
+            "amount": discount_price_amount,
+            "currency": "UAH",
+        },
+    }
+
+    response = make_request(
+        BASE_LINK_INTERTOP + f"products/{article}/offers/prices",
+        bearer=bearer,
+        data=payload,
+        method=RequestMethod.PATCH.value,
+    )
+    return response
+
 def archive_product(
     article,
     bearer,

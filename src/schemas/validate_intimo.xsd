@@ -173,7 +173,6 @@
                             </xs:simpleType>
                         </xs:element>
                         <xs:element name="title" type="xs:string"/>
-                        <xs:element name="color_image_link" type="xs:anyURI"/>
                         <xs:element name="color_image_code" minOccurs="0">
                             <xs:simpleType>
                                 <xs:restriction base="xs:string">
@@ -239,13 +238,14 @@
                         <xs:element name="price" type="xs:decimal"/>
                         <xs:element name="price_r" type="xs:decimal"/>
                         <xs:element name="price_w" type="xs:decimal"/>
+                        <xs:element name="discount" type="xs:decimal"/>
+                        <xs:element name="discount_w" type="xs:decimal"/>
                         <xs:element name="currency_price" type="currencyType" minOccurs="0"/>
                         <xs:element name="currency_price_r" type="currencyType" minOccurs="0"/>
                         <xs:element name="currency_price_w" type="currencyType" minOccurs="0"/>
                         <xs:element name="discount" type="discountType" minOccurs="0"/>
                         <xs:element name="discount_w" type="discountType" minOccurs="0"/>
                         <xs:element name="image_link" type="ImageLinkType" minOccurs="1" maxOccurs="unbounded"/>
-                        <xs:element name="video_link" type="xs:anyURI" minOccurs="0" maxOccurs="unbounded"/>
                         <xs:element name="variations">
                             <xs:complexType>
                                 <xs:sequence>

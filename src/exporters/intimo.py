@@ -1,9 +1,12 @@
 from collections import defaultdict
+import csv
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
-from lxml import etree as ET  # type: ignore
+from lxml import etree as ET
+
+from src.config import DATA_DIR  # type: ignore
 
 from ..schemas import data_schema
 from src.logger_config import app_logger
@@ -31,12 +34,13 @@ class XmlExporterIntimo(BaseExporter):
         """
         super().__init__(catalog)
         self.brand_map: Dict[str, int] = {}
-        self.color_map: Dict[str, str] = {}
+        self.color_map: Dict[str, Tuple[int, str]] = {}
         self.category_to_line_id_map: Dict[str, str] = {}
         self.collection_to_brand_map: Dict[int, int] = {}
         self.article_groups: Dict[str, List[data_schema.Offer]] = defaultdict(list)
         self.boutique_coefficient: float = boutique_coefficient
         self.wholesale_ratio: float = wholesale_ratio
+
 
     def _prepare_data_maps(self):
         """
@@ -66,14 +70,15 @@ class XmlExporterIntimo(BaseExporter):
                 if brand_id:
                     self.collection_to_brand_map[offer.category_id] = brand_id
 
-        # 3. Collect all unique colors
-        for offer in self.catalog.offers:
-            for param in offer.params:
-                if param.name.lower() in ["колір", "color"] and param.value:
-                    color_name = param.value.strip().lower()
-                    if color_name not in self.color_map:
-                        key = str(len(self.color_map) + 1)
-                        self.color_map[color_name] = key
+        # 3. Collect all colors
+        with open(str(DATA_DIR / "colors_intimo.csv"), newline="", encoding="utf-8") as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                self.color_map[row["title"].strip()] = (
+                    int(row["id"]),
+                    row["color_image_code"].strip(),
+                )
+
 
     def export(self, output_path: str):
         """
@@ -183,12 +188,13 @@ class XmlExporterIntimo(BaseExporter):
         Build the <colors> section containing all unique colors.
         """
         colors_node = self._create_sub_element(parent, "colors")
-        for name, id in self.color_map.items():
+        for title, (id, image_code) in self.color_map.items():
             color_node = self._create_sub_element(colors_node, "color")
             self._create_sub_element(color_node, "id", id)
-            self._create_sub_element(color_node, "title", name)
-            # TODO: Add color image link if available
-            # self._create_sub_element(color_node, "color_image_link", "https://placeholder.com/color.jpg")
+            self._create_sub_element(color_node, "title", title)
+            self._create_sub_element(color_node, "color_image_code", image_code)
+            # TODO: Add color image link
+            # self._create_sub_element(color_node, "color_image_link", image_code)
 
     def _build_items_section(self, parent: ET._Element):
         """
@@ -251,30 +257,32 @@ class XmlExporterIntimo(BaseExporter):
             self._create_sub_element(item_node, "price_r", price_r)
             self._create_sub_element(item_node, "price_w", price_w)
 
-            # Collect unique images from all offers in the group
+            special_price = main_offer.discount_price if main_offer.discount_price else 0
+            if special_price > 0:
+                discount = round(((price_r - special_price) / price_r) * 100, 2) if price_r > 0 else 0
+            else:
+                discount = 0
+            self._create_sub_element(item_node, "discount", discount)
+            self._create_sub_element(item_node, "discount_w", discount)
+
             unique_pictures = set()
             for offer_in_group in offer_group:
                 unique_pictures.update(offer_in_group.pictures)
 
-            for i, pic_url in enumerate(list(unique_pictures)):
+            color_id = ""
+            for param in main_offer.params:
+                if param.name.lower() in ["колір", "color", "цвет"]:
+                    param_value = str(param.value.lower())
+                    colorId_colorCode = self.color_map.get(param_value)
+                    if not colorId_colorCode:
+                        app_logger.warning(f"Color not found for image {pic_url=} in article {article=} {main_offer.id=} {param.value=}")
+            if colorId_colorCode:
+                color_id = colorId_colorCode[0]
+
+            for pic_url in list(unique_pictures):
                 img_node = self._create_sub_element(item_node, "image_link", pic_url)
-
-                # Attempt to associate color with image
-
-                color_slug_id_for_pic = None
-                for offer_in_group in offer_group:
-                    if pic_url in offer_in_group.pictures:
-                        for param in offer_in_group.params:
-                            if param.name.lower() in ["колір", "color", "цвет"]:
-                                color_slug_id_for_pic = self.color_map.get(
-                                    str(param.value)
-                                )
-                                break
-                    if color_slug_id_for_pic:
-                        break
-
-                if color_slug_id_for_pic:
-                    img_node.set("color", color_slug_id_for_pic)
+                if color_id:
+                    img_node.set("color", str(color_id))
 
             # Build variations for this item
             self._build_variations_section(item_node, offer_group)
@@ -290,24 +298,34 @@ class XmlExporterIntimo(BaseExporter):
         :param offer_group: List of Offer objects representing variations.
         """
         variations_node = self._create_sub_element(parent, "variations")
-
+        missing_colors = set()
         for offer_variation in offer_group:
-            color_slug_id = "NULL"
-            size = "one-size"
+            color_id = "1"
+            size = ""
 
             for param in offer_variation.params:
                 param_name_lower = param.name.lower()
                 if param_name_lower in ["колір", "color", "цвет"]:
-                    color_slug_id = self.color_map.get(str(param.value))
+                    colorId_colorCode = self.color_map.get(str(param.value.lower()))
+                    if not colorId_colorCode:
+                        app_logger.warning(f"Color not found {str(param.value)}")
+                    else:
+                        color_id = str(colorId_colorCode[0])
                 elif param_name_lower in ["зріст", "розмір", "size"]:
                     size = str(param.value)
             variation_node = self._create_sub_element(variations_node, "variation")
+            if color_id == "1":
+                missing_colors.add(offer_variation.article)
 
+            if not size:
+                app_logger.warning(
+                    f"Missing size for variation {offer_variation.article}"
+                )
             # Generate unique variation ID based on offer ID, color, and size
-            variation_id = f"{offer_variation.id.split('-')[0]}_{color_slug_id}_{size}"
+            variation_id = f"{offer_variation.id.split('-')[0]}_{color_id}_{size}"
             self._create_sub_element(variation_node, "variation_id", variation_id)
 
-            self._create_sub_element(variation_node, "color", color_slug_id)
+            self._create_sub_element(variation_node, "color", color_id)
             self._create_sub_element(variation_node, "size", size)
 
             # Stock quantity: 0 if item is out of stock
@@ -317,3 +335,6 @@ class XmlExporterIntimo(BaseExporter):
             self._create_sub_element(
                 variation_node, "stock_quantity", str(stock_quantity)
             )
+        if missing_colors:
+            for offer_article in missing_colors:
+                app_logger.warning(f"Missing color for variation {offer_article}")

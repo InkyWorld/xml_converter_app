@@ -85,19 +85,19 @@ def main():
         )
     for catalog_path, catalog in all_parsed_catalogs:
         try:
-            # exporterIntimo = XmlExporterIntimo(catalog=catalog)
-            # output_file_path = OUTPUT_DIR / f"{catalog_path}_intimo.xml"
-            # exporterIntimo.export(str(output_file_path))
-            # validator_intimo.validate(xml_path=Path(output_file_path))
+            exporterIntimo = XmlExporterIntimo(catalog=catalog)
+            output_file_path = OUTPUT_DIR / f"{catalog_path}_intimo.xml"
+            exporterIntimo.export(str(output_file_path))
+            validator_intimo.validate(xml_path=Path(output_file_path))
 
             # exporterKasta = XmlExporterKasta(catalog=catalog)
             # output_file_path = OUTPUT_DIR / f"{catalog_path}_kasta.xml"
             # exporterKasta.export(str(output_file_path))
             # validator_kasta.validate(xml_path=Path(output_file_path))
 
-            exporterIntertop = ExporterIntertop(catalog=catalog)
+            # exporterIntertop = ExporterIntertop(catalog=catalog)
             # exporterIntertop.update_product_price()
-            exporterIntertop.update_intertop()
+            # exporterIntertop.update_intertop()
 
         except Exception as e:
             app_logger.error(f"Unexpected error during export: {e}")
