@@ -8,10 +8,12 @@ import requests
 from tqdm import tqdm
 
 from src.config import BASE_LINK_INTERTOP
+
 if not BASE_LINK_INTERTOP:
     raise ValueError("BASE_LINK_INTERTOP is not set in config.py")
 
 app_logger = logging.getLogger(__name__)
+
 
 class RequestMethod(Enum):
     GET = "get"
@@ -68,12 +70,9 @@ def make_request(
 
         except requests.HTTPError as e:
             if i == retries - 1:
-                app_logger.error(
-                    f"Max retries reached for {method.upper()} {link}"
-                )
+                app_logger.error(f"Max retries reached for {method.upper()} {link}")
                 app_logger.error(f"Params: {params}, JSON Data: {data}")
                 app_logger.error(f"Response Body: {e.response.text}")
-            
 
 
 def auth(link, key, secret) -> Tuple[str | None, int | None]:
@@ -117,11 +116,7 @@ def auth(link, key, secret) -> Tuple[str | None, int | None]:
 
 
 def updating_product_price(
-    article,
-    bearer,
-    base_price_amount,
-    discount_price_amount,
-    activity
+    article, bearer, base_price_amount, discount_price_amount, activity
 ):
     payload = {
         "active": activity,
@@ -143,40 +138,39 @@ def updating_product_price(
     )
     return response
 
-def create_product(
-    article,
+
+def create_offer_for_product(
     bearer,
+    article,
+    barcode,
+    quantity,
+    size_id,
     base_price_amount,
     discount_price_amount,
-    activity
 ):
     payload = {
-        "active": activity,
-        "base_price": {
-            "amount": base_price_amount,
-            "currency": "UAH",
-        },
-        "discount_price": {
-            "amount": discount_price_amount,
-            "currency": "UAH",
-        },
+        "barcode": barcode,
+        "active": True,
+        "base_price": {"amount": base_price_amount, "currency": "UAH"},
+        "discount_price": {"amount": discount_price_amount, "currency": "UAH"},
+        "quantity": quantity,
+        "size_id": size_id,
     }
 
     response = make_request(
-        BASE_LINK_INTERTOP + f"products/{article}/offers/prices",
+        BASE_LINK_INTERTOP + f"products/{article}/offers",
         bearer=bearer,
         data=payload,
-        method=RequestMethod.PATCH.value,
+        method=RequestMethod.POST.value,
     )
     return response
+
 
 def archive_product(
     article,
     bearer,
 ):
-    payload = {
-        "active": False
-    }
+    payload = {"active": False}
 
     response = make_request(
         BASE_LINK_INTERTOP + f"products/{article}",
@@ -186,14 +180,9 @@ def archive_product(
     )
     return response
 
-def change_product_activity(
-    article,
-    bearer,
-    activity: bool
-):
-    payload = {
-        "active": activity
-    }
+
+def change_product_activity(article, bearer, activity: bool):
+    payload = {"active": activity}
 
     response = make_request(
         BASE_LINK_INTERTOP + f"products/{article}",
@@ -203,14 +192,9 @@ def change_product_activity(
     )
     return response
 
-def change_product_status(
-    article,
-    bearer,
-    status
-):
-    payload = {
-        "status": status
-    }
+
+def change_product_status(article, bearer, status):
+    payload = {"status": status}
 
     response = make_request(
         BASE_LINK_INTERTOP + f"products/{article}/status",
@@ -220,6 +204,7 @@ def change_product_status(
     )
     return response
 
+
 async def update_offer(
     client: httpx.AsyncClient,
     bearer,
@@ -228,7 +213,7 @@ async def update_offer(
     base_price_amount,
     discount_price_amount,
     quantity,
-    activity
+    activity,
 ):
     payload = {
         "base_price": {
@@ -240,7 +225,7 @@ async def update_offer(
             "currency": "UAH",
         },
         "active": activity,
-        "quantity": quantity
+        "quantity": quantity,
     }
     response = await make_request_async(
         client=client,
@@ -250,6 +235,7 @@ async def update_offer(
         method=RequestMethod.PATCH.value,
     )
     return response
+
 
 def archive_offer_and_quantity_zero(
     bearer,
@@ -288,15 +274,13 @@ def archive_offer_and_quantity_zero(
     )
     return response
 
-def update_offers_quantity(
-    bearer,
-    payload: dict
-):
+
+def update_offers_quantity(bearer, payload: dict):
     """
     Args:
         bearer: The bearer token for authentication.
         offers_data: dict
-                     Example: 
+                     Example:
                      {
                         "offers": [
                             {
@@ -317,27 +301,17 @@ def update_offers_quantity(
     )
     return response
 
-def update_offers_prices(
-    bearer,
-    offers
-):
+
+def update_offers_prices(bearer, offers):
     payload = []
     for offer in offers:
         intertop_barcode = offer[0]
         intertop_base_price_amount = offer[1]
         intertop_discount_price_amount = offer[2]
 
-        payload.append({
-            "barcode": intertop_barcode,
-            "base_price": {
-                "amount": intertop_base_price_amount,
-                "currency": "UAH",
-            },
-            "discount_price": {
-                "amount": intertop_discount_price_amount,
-                "currency": "UAH",
-            },
-            "delayed_prices": {
+        payload.append(
+            {
+                "barcode": intertop_barcode,
                 "base_price": {
                     "amount": intertop_base_price_amount,
                     "currency": "UAH",
@@ -346,10 +320,20 @@ def update_offers_prices(
                     "amount": intertop_discount_price_amount,
                     "currency": "UAH",
                 },
-            },
-            "active": False,
-            "quantity": 0,
-        })
+                "delayed_prices": {
+                    "base_price": {
+                        "amount": intertop_base_price_amount,
+                        "currency": "UAH",
+                    },
+                    "discount_price": {
+                        "amount": intertop_discount_price_amount,
+                        "currency": "UAH",
+                    },
+                },
+                "active": False,
+                "quantity": 0,
+            }
+        )
     response = make_request(
         BASE_LINK_INTERTOP + "offers/prices",
         bearer=bearer,
@@ -357,7 +341,6 @@ def update_offers_prices(
         method=RequestMethod.PATCH.value,
     )
     return response
-
 
 
 def get_product_articles(bearer):
@@ -382,6 +365,7 @@ def get_product_articles(bearer):
         all_articles.extend(articles)
         offset += 300
     return all_articles
+
 
 def get_products(bearer):
     all_products = []
@@ -441,6 +425,7 @@ def get_offers_data_by_articles(bearer: str, articles: list) -> dict:
                 ]
     return result
 
+
 def get_product_offers(bearer: str, product) -> dict:
     result = {}
     product_art = product.get("article")
@@ -465,6 +450,7 @@ def get_product_offers(bearer: str, product) -> dict:
                 quantity,
             ]
     return result
+
 
 async def make_request_async(
     client: httpx.AsyncClient,
@@ -522,10 +508,12 @@ async def make_request_async(
                 # Обрабатываем 429 (rate limit)
                 if status == 429:
                     retry_after = int(e.response.headers.get("Retry-After", delay))
-                    app_logger.warning(f"429 Too Many Requests — спим {retry_after} сек")
+                    app_logger.warning(
+                        f"429 Too Many Requests — спим {retry_after} сек"
+                    )
                     await asyncio.sleep(retry_after)
                     continue
-                
+
                 if i == retries - 1:
                     app_logger.error(
                         f"HTTP Error {status}: attempt={attempt}-{i} for {method.upper()} {link}"
@@ -548,24 +536,25 @@ async def make_request_async(
         )
         await asyncio.sleep(delay)
 
+
 async def get_product_offers_async(
-    client: httpx.AsyncClient, # Приймає сесію клієнта
-    bearer: str, 
-    product
+    client: httpx.AsyncClient,  # Приймає сесію клієнта
+    bearer: str,
+    product,
 ) -> dict:
     """
     Асинхронна функція для отримання пропозицій по продукту.
     """
     result = {}
     product_art = product.get("article")
-    
+
     # Використовуємо асинхронний запит
     response = await make_request_async(
         client=client,
-        link=BASE_LINK_INTERTOP + f"products/{product_art}/offers", 
-        bearer=bearer
+        link=BASE_LINK_INTERTOP + f"products/{product_art}/offers",
+        bearer=bearer,
     )
-    
+
     if response:
         items = response.get("data", {}).get("items", [])
         for item in items:
@@ -585,19 +574,24 @@ async def get_product_offers_async(
             ]
     return result
 
-async def run_all_offer_updates(tasks_args_list: list, task_description: str = "Updating offers", concurrency_limit: int = 10):
+
+async def run_all_offer_updates(
+    tasks_args_list: list,
+    task_description: str = "Updating offers",
+    concurrency_limit: int = 10,
+):
     """
     Створює один AsyncClient і паралельно виконує всі завдання update_offer.
-    
+
     Args:
-        tasks_args_list: Список, де кожен елемент - це кортеж 
-                         з аргументами для update_offer 
+        tasks_args_list: Список, де кожен елемент - це кортеж
+                         з аргументами для update_offer
                          (bearer, article, barcode, ...).
     """
     semaphore = asyncio.Semaphore(concurrency_limit)
-    
+
     async with httpx.AsyncClient() as client:
-        
+
         async def semaphore_task_wrapper(args):
             async with semaphore:
                 return await update_offer(client, *args)
@@ -610,11 +604,9 @@ async def run_all_offer_updates(tasks_args_list: list, task_description: str = "
             f"Running {len(tasks)} parallel {task_description} tasks "
             f"with a concurrency limit of {concurrency_limit}..."
         )
-        
+
         for future in tqdm(
-            asyncio.as_completed(tasks), 
-            total=len(tasks), 
-            desc=task_description
+            asyncio.as_completed(tasks), total=len(tasks), desc=task_description
         ):
             try:
                 await future

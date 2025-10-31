@@ -2,6 +2,8 @@ import asyncio
 import csv
 from typing import Dict, List, Set, Tuple
 
+from tqdm import tqdm
+
 from src.config import (
     BASE_LINK_INTERTOP,
     DATA_DIR,
@@ -13,6 +15,7 @@ from src.senders.intertop import (
     async_load_wrapper,
     auth,
     change_product_status,
+    create_offer_for_product,
     get_product_articles,
     get_products,
     run_all_offer_updates,
@@ -216,7 +219,8 @@ class ExporterIntertop:
         used_article_sizeID_mapping = set()
         update_offer_task_args = []
 
-        for offer in self.catalog.offers:
+        created_offers_count = 0
+        for offer in tqdm(self.catalog.offers):
             if offer.article in articles_only_on_rozetka:
                 app_logger.warning(
                     f"vendor code that is not on intertop {offer.article}"
@@ -279,14 +283,24 @@ class ExporterIntertop:
                                 )
                             )
                             break
-                    else:
-                        app_logger.warning(
-                            f"немає офера для сайз ід {offer.article=} {rozetka_size_value=} {intertop_size_id=}"
-                        )
-
-                        # створення офера для сайз ид
                         break
-
+                    else:
+                        created_offers_count += 1
+                        articles_to_moderate.add(all_products_map.get(offer.article))
+                        if offer.article not in vendorCodes_draft:
+                            vendorCodes_draft.append(str(offer.article))
+                            change_product_status(all_products_map.get(offer.article), self.bearer, "draft")
+                        create_offer_for_product(
+                            self.bearer,
+                            article=all_products_map.get(offer.article),
+                            barcode=f"{offer.article}{intertop_size_id}",
+                            quantity=offer.stock_quantity,
+                            size_id=intertop_size_id,
+                            base_price_amount=offer.price,
+                            discount_price_amount=offer.discount_price,
+                        )
+                        break
+        app_logger.info(f"Created {created_offers_count} new offers.")
         return update_offer_task_args, used_article_sizeID_mapping
 
     def _run_async_updates(
